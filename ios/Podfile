@@ -1,0 +1,53 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+def node_require(script)
+  require Pod::Executable.execute_command('node', ['-p',
+    "require.resolve(
+      '#{script}',
+      {paths: [process.argv[1]]},
+    )", __dir__]).strip
+end
+
+node_require('react-native/scripts/react_native_pods.rb')
+node_require('react-native-permissions/scripts/setup.rb')
+
+platform :ios, '13.4'  # Update to minimum iOS 13.4
+
+prepare_react_native_project!
+
+setup_permissions([
+  'Bluetooth',
+  'Camera',
+  'LocationWhenInUse',
+  'Microphone',
+])
+
+pod 'react-native-webrtc', :path => '../node_modules/@videosdk.live/react-native-webrtc'
+
+linkage = ENV['USE_FRAMEWORKS']
+if linkage != nil
+  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+  use_frameworks! :linkage => linkage.to_sym
+end
+
+config = use_native_modules!
+
+target 'shareecare' do
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  target 'shareecareTests' do
+    inherit! :complete
+  end
+end
+
+post_install do |installer|
+  react_native_post_install(
+    installer,
+    config[:reactNativePath],
+    :mac_catalyst_enabled => false
+    # Uncomment if ccache is enabled
+    # :ccache_enabled => true
+  )
+end
