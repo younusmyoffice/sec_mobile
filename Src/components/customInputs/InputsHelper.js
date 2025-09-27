@@ -27,6 +27,7 @@ export const getMaxLengthHelper = (name, value) => {
   if (name === 'mobileOremail') {
     return /^\d*$/.test(value) ? 10 : 100;
   }
+  if (name === 'dialing_code') return 4;
   if (name === 'mobile') return 10;
   if (name === 'CVV') return 3;
   if (name === 'account') return 16;

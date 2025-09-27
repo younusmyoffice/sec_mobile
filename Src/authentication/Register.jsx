@@ -10,6 +10,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import authenticationStyle from './AuthenticationStyle';
 import CustomInputs from '../components/customInputs/CustomInputs';
 import CustomButton from '../components/customButton/CustomButton';
+import DialingCodeDropdown from '../components/customInputs/DialingCodeDropdown';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import axios from 'axios';
 import {baseUrl} from '../utils/baseUrl';
@@ -29,6 +30,7 @@ const Register = () => {
     mobile: 0,
     email: '',
     password: '',
+    dialing_code: '91', // Default to India's dialing code
     // cpassword: '',
     role_id: roleId,
   });
@@ -50,21 +52,21 @@ const Register = () => {
   );
   const registerField = [
     {
-      id: 1,
+      id: 2,
       label: 'Mobile No',
       name: 'mobile',
       type: 'number',
       placeholder: 'Mobile No',
     },
     {
-      id: 2,
+      id: 3,
       label: 'Email Address',
       name: 'email',
       type: 'email',
       placeholder: 'Email Address',
     },
     {
-      id: 3,
+      id: 4,
       label: 'Password',
       name: 'password',
       type: 'password',
@@ -91,6 +93,21 @@ const Register = () => {
           <View style={{gap: 25}}>
             <View style={authenticationStyle.inputs}>
               <View>
+                {/* Dialing Code Dropdown */}
+                <DialingCodeDropdown
+                  label="Country & Dialing Code"
+                  value={registerData.dialing_code}
+                  onChange={handleChange}
+                  placeholder="Select Country"
+                  fontSize={20}
+                />
+                {errors.dialing_code && (
+                  <Text style={{color: 'red', marginTop: 5, marginLeft: 10}}>
+                    {errors.dialing_code}
+                  </Text>
+                )}
+                
+                {/* Other form fields */}
                 {registerField.map(field => (
                   <>
                     <CustomInputs
