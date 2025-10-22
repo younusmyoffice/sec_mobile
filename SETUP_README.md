@@ -1,6 +1,6 @@
 npm # Sharecare Mobile App - Complete Setup Guide
 
-This guide provides step-by-step instructions to set up the Sharecare Mobile App development environment with exact versions and dependencies.
+This guide provides step-by-step instructions to set up the Sharecare Mobile App development environment with exact versions and dependencies...... 
 
 ## 📋 System Requirements
 
