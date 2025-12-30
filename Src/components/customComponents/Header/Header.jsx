@@ -27,6 +27,31 @@ import CustomLocationModal from '../../customModal/CustomLocationModal';
 import { useLoc } from '../../../Store/LocationContext';
 import Modal from 'react-native-modal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../../Store/Authentication';
+
+// Helper function to determine profile navigation based on user role
+const getProfileNavigation = async () => {
+  try {
+    const roleIdString = await AsyncStorage.getItem('role_id');
+    if (!roleIdString || roleIdString === 'null') return null;
+    
+    const roleId = JSON.parse(roleIdString);
+    
+    // Map role_id to their respective profile screens
+    const profileRoutes = {
+      2: 'admin-profile',      // HCF Admin
+      3: 'ProfileScreenDoctor', // Doctor
+      4: 'diagnostic-profile',   // Diagnostic
+      5: 'Profile',               // Patient
+      6: 'clinic-profile',        // Clinic
+    };
+    
+    return profileRoutes[roleId] || null;
+  } catch (error) {
+    console.error('Error getting profile navigation:', error);
+    return null;
+  }
+};
 
 const Header = ({
   logo,
@@ -42,6 +67,7 @@ const Header = ({
   id,
 }) => {
   const { locName } = useLoc();
+  const { handleLogout } = useAuth();
   const screenWidth = Dimensions.get('window').width;
   const navigation = useNavigation();
   console.log("length",notification?.length);
@@ -50,6 +76,20 @@ const Header = ({
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [location, setLocation] = useState(false);
   const [locationname, setLocationName] = useState();
+  
+  // Handle profile navigation based on user role
+  const handleProfileNavigation = async () => {
+    try {
+      const profileRoute = await getProfileNavigation();
+      if (profileRoute) {
+        navigation.navigate(profileRoute);
+      } else {
+        console.log('⚠️ No profile route found for current user role');
+      }
+    } catch (error) {
+      console.error('Error navigating to profile:', error);
+    }
+  };
   const locnameReciever = locname => {
     setLocationName(locname);
   };
@@ -193,10 +233,14 @@ const Header = ({
                   color="#AEAAAE"
                 />
               </TouchableOpacity>
-              <TouchableOpacity onPress={async() => {
-                await AsyncStorage.clear();
-                navigation.navigate('Launchscreen');
-              }}>
+              <TouchableOpacity onPress={handleProfileNavigation}>
+                <MaterialCommunityIcons
+                  name="account"
+                  size={hp(3)}
+                  color="#AEAAAE"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleLogout}>
                 <MaterialCommunityIcons
                   name="logout"
                   size={hp(3)}

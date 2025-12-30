@@ -1,191 +1,132 @@
-// import { View, Text } from 'react-native';
-// import React, { useEffect, useState } from 'react';
-// import CheckBox from '@react-native-community/checkbox';
-// import {
-//   widthPercentageToDP as wp,
-//   heightPercentageToDP as hp,
-// } from 'react-native-responsive-screen';
-// import CustomInput from '../../../../../components/customInputs/CustomInputs';
-// import CustomTable from '../../../../../components/customTable/CustomTable';
-// import { useCommon } from '../../../../../Store/CommonContext';
-// import axiosInstance from '../../../../../utils/axiosInstance';
-// import { baseUrl } from '../../../../../utils/baseUrl';
+/**
+ * ============================================================================
+ * CLINIC SALES ACTIVITIES
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Component to display and manage clinic sales activities in a table format.
+ * 
+ * FEATURES:
+ * - Display sales activities data in CustomTable
+ * - Loading states
+ * - Error handling
+ * 
+ * SECURITY:
+ * - Uses axiosInstance for authenticated API calls
+ * - Validates userId before API calls
+ * 
+ * ERROR HANDLING:
+ * - CustomToaster for user-friendly error/success messages
+ * - Loading states with CustomLoader
+ * - Empty state handling
+ * 
+ * REUSABLE COMPONENTS:
+ * - CustomLoader: Loading indicator
+ * - CustomToaster: Toast notifications
+ * - CustomTable: Table display component
+ * 
+ * ACCESS TOKEN:
+ * - Handled automatically by axiosInstance (reusable throughout app)
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * @module ClinicSalesActivities
+ */
 
-// const ClinicSalesActivities = () => {
-//   const [checkboxes, setCheckboxes] = useState([
-//     { id: 1, label: 'All', isSelected: true },
-//     { id: 2, label: 'Completed', isSelected: false },
-//     { id: 3, label: 'canceled', isSelected: false },
-//   ]);
-//   const [cardData, setCardData] = useState([]);
-//   const [loading, setLoading] = useState(false);
-//   const [error, setError] = useState(null); // Error state
-//   const { userId } = useCommon();
-
-//   // Toggle checkboxes
-//   const toggleCheckbox = (id) => {
-//     setCheckboxes((prev) =>
-//       prev.map((checkbox) =>
-//         checkbox.id === id
-//           ? { ...checkbox, isSelected: true }  // Set selected checkbox to true
-//           : { ...checkbox, isSelected: false } // Deselect all other checkboxes
-//       )
-//     );
-//   };
-
-
-//   // Filter the data based on selected checkboxes
-//   const filterData = (data) => {
-//     const selectedStatuses = checkboxes
-//       .filter((checkbox) => checkbox.isSelected)
-//       .map((checkbox) => checkbox.label.toLowerCase());
-
-//     if (selectedStatuses.includes('all')) {
-//       return data; // If 'All' is selected, return all data
-//     }
-
-//     return data.filter((item) =>
-//       selectedStatuses.includes(item.status.toLowerCase())
-//     );
-//   };
-
-//   // Fetch data from API
-//   const doctorUpcommingAppointment = async () => {
-//     try {
-//       setLoading(true);
-//       const response = await axiosInstance.get(
-//         `${baseUrl}hcf/${userId}/clinicSaleActivity`
-//       );
-
-//       if (response.data && response.data.response) {
-//         const filteredData = filterData(response.data.response); // Filter data based on checkboxes
-//         setCardData(filteredData); // Set the filtered data
-//       }
-//     } catch (err) {
-//       console.error('Error fetching appointment requests:', err);
-//       setError('Failed to load data.');
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   // Effect to load data initially and when checkboxes change
-//   useEffect(() => {
-//     doctorUpcommingAppointment();
-//   }, [checkboxes]); // Re-run when checkboxes change
-// const header = [
-//   'Name & Details',
-//   'Date',
-//       'Time',
-//       'Amount',
-//       'Package',
-//       'Duration',
-//   'Department',
-//   'Status',
-// ];
-//   return (
-//     <View style={{ gap: 10 }}>
-//       {/* Checkbox Filter */}
-//       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-//         {checkboxes.map((item) => (
-//           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }} key={item.id}>
-//             <CheckBox
-//               boxType="square"
-//               lineWidth={2}
-//               tintColors={{ true: '#E72B4A', false: '#E72B4A' }}
-//               value={item.isSelected}
-//               onValueChange={() => toggleCheckbox(item.id)}
-//             />
-//             <Text style={{ color: 'black', fontFamily: 'Poppins-Regular', fontSize: hp(2) }}>
-//               {item.label}
-//             </Text>
-//           </View>
-//         ))}
-//       </View>
-
-//       {/* Input Filters */}
-//       {/* <View style={{ alignSelf: 'center' }}>
-//         <View style={{ flexDirection: 'row', gap: 10 }}>
-//           <CustomInput
-//             type={'select'}
-//             selectborderBottomWidth={0.5}
-//             selectborderBottomColor="#E6E1E5"
-//             selectborderRadius={10}
-//             selectbackgroundColor="#f0f0f0"
-//             selectwidth={wp(30)}
-//             selectborderWidth={0.5}
-//             selectborderColor={'#E6E1E5'}
-//             placeholder={'Date'}
-//             selectplaceholdercolor={'#787579'}
-//           />
-//           <CustomInput
-//             type={'select'}
-//             selectborderBottomWidth={0.5}
-//             selectborderBottomColor="#E6E1E5"
-//             selectborderRadius={10}
-//             selectbackgroundColor="#f0f0f0"
-//             selectwidth={wp(30)}
-//             selectborderWidth={0.5}
-//             selectborderColor={'#E6E1E5'}
-//             placeholder={'Filter'}
-//             selectplaceholdercolor={'#787579'}
-//           />
-//         </View>
-//       </View> */}
-
-//       {/* Render Custom Table */}
-//       <View>
-//         <CustomTable
-//         header={header}
-//         backgroundkey={'status'}
-//         isUserDetails={true}
-//         data={cardData}
-//         flexvalue={2}
-//         rowDataCenter={true}
-//         textCenter={'center'}
-//       />
-//       </View>
-//     </View>
-//   );
-// };
-
-// export default ClinicSalesActivities;
-
-import { StyleSheet, Text, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
-import CustomTable from '../../../../../components/customTable/CustomTable'
+import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import CustomTable from '../../../../../components/customTable/CustomTable';
 import axiosInstance from '../../../../../utils/axiosInstance';
 import { useCommon } from '../../../../../Store/CommonContext';
+import CustomLoader from '../../../../../components/customComponents/customLoader/CustomLoader';
+import CustomToaster from '../../../../../components/customToaster/CustomToaster';
+import Logger from '../../../../../constants/logger';
+import { COLORS } from '../../../../../constants/colors';
 
 export default function ClinicSalesActivities() {
   const { userId } = useCommon();
   const [cardData, setCardData] = useState([]);
-  const [load, setLoad] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  /**
+   * Table headers for sales activities
+   */
   const header = [
     'Name & Details',
     'Status',
     'Amount',
     'Plan name',
   ];
-  const handleRecieved = async () => {
-    setLoad(true)
+
+  /**
+   * Fetch clinic sales activities
+   * SECURITY: Validates userId before API call
+   * ERROR HANDLING: Comprehensive error handling with user-friendly messages
+   */
+  const handleReceived = async () => {
+    // SECURITY: Validate userId before API call
+    if (!userId || userId === 'null' || userId === 'undefined') {
+      Logger.error('Invalid userId for sales activities', { userId });
+      CustomToaster.show('error', 'Error', 'Invalid user session. Please login again.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
     try {
+      Logger.api('GET', `hcf/${userId}/clinicSaleActivity`);
+      
       const response = await axiosInstance.get(`hcf/${userId}/clinicSaleActivity`);
-      console.log("reportShared data==dfd=", response.data.response);
-      setCardData(response.data.response);
-    } catch (e) {
-      console.log(e);
+      
+      Logger.debug('Sales activities response', { 
+        count: response.data?.response?.length || 0 
+      });
+
+      if (response.data && response.data.response) {
+        // SECURITY: Validate response data type
+        const responseData = Array.isArray(response.data.response) 
+          ? response.data.response 
+          : [];
+        
+        setCardData(responseData);
+        Logger.info('Sales activities fetched successfully', { 
+          count: responseData.length 
+        });
+      } else {
+        setCardData([]);
+        Logger.warn('No sales activities in response');
+      }
+    } catch (err) {
+      Logger.error('Error fetching sales activities', err);
+      
+      const errorMessage = err?.response?.data?.message || 
+        'Failed to fetch sales activities. Please try again later.';
+      
+      setError(errorMessage);
+      CustomToaster.show('error', 'Error', errorMessage);
+      setCardData([]);
     } finally {
-      setLoad(false)
-  
+      setLoading(false);
     }
   };
+
   useEffect(() => {
-    handleRecieved();
-  }, []);
+    if (userId) {
+      Logger.debug('ClinicSalesActivities initialized', { userId });
+      handleReceived();
+    } else {
+      Logger.warn('ClinicSalesActivities: userId not available');
+    }
+  }, [userId]);
+
   return (
-    <View style={{flex:1,backgroundColor:'red',height:'100%',width:'100%'}}>
-      
+    <View style={styles.container}>
+      {/* REUSABLE COMPONENT: CustomLoader for loading states */}
+      {loading && <CustomLoader />}
       
       <CustomTable
         header={header}
@@ -195,21 +136,20 @@ export default function ClinicSalesActivities() {
         flexvalue={2}
         rowDataCenter={true}
         textCenter={'center'}
-        loading={load}
+        loading={loading}
       />
-      {/* <CustomTable
-        textCenter={'center'}
-        header={header}
-        data={data}
-        flexvalue={2}
-        isUserDetails={true}
-        rowTextCenter={true}
-        rowDataCenter={true}
-        backgroundkey={'action_id'}
-        onpress={handleViewAudit}
-      /> */}
     </View>
-  )
+  );
 }
 
-const styles = StyleSheet.create({})
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.BG_WHITE,
+    width: '100%',
+  },
+});

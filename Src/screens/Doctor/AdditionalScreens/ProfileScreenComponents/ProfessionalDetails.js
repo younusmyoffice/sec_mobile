@@ -1,5 +1,5 @@
 import {StyleSheet, Text, View} from 'react-native';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import CustomInput from '../../../../components/customInputs/CustomInputs';
 import InAppHeader from '../../../../components/customComponents/InAppHeadre/InAppHeader';
 import {doctorDetails} from '../../../../utils/data';
@@ -7,7 +7,7 @@ import CustomEduLicAwardCard from '../../../../components/customEdu-Licen-AwardC
 import CustomButton from '../../../../components/customButton/CustomButton';
 import axiosInstance from '../../../../utils/axiosInstance';
 import {useCommon} from '../../../../Store/CommonContext';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -144,18 +144,30 @@ export default function ProfessionalDetails({
       console.error('Error fetching lab data:', error.response);
     }
   };
-  useEffect(() => {
+  // Refresh all data when component mounts or comes into focus
+  const refreshAllData = () => {
+    console.log('🔄 Refreshing all professional data...');
     getawards();
-    if (!check) {
-      getexprience();
-    }
+    getexprience();
     getlicenses();
+  };
+
+  useEffect(() => {
+    refreshAllData();
   }, []);
+
+  // Refresh data when screen comes into focus (when returning from Add screens)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🎯 ProfessionalDetails screen focused, refreshing data...');
+      refreshAllData();
+    }, [])
+  );
   return (
     <View>
       {/* Educational Details Section */}
       <InAppHeader LftHdr="Educational Details" />
-      {educationalDetail?.map(item => (
+      {educationalDetail?.map((item, index) => (
         <CustomInput
           ref={el => (inputRefs.current[index] = el)}
           key={item.id}
@@ -181,7 +193,7 @@ export default function ProfessionalDetails({
       <InAppHeader LftHdr="Professional Details" />
 
       {/* Professional Details Section */}
-      {profestionalDetail?.map(item => (
+      {profestionalDetail?.map((item, index) => (
         <CustomInput
           ref={el => (inputRefs.current[index] = el)}
           key={item.id}
@@ -319,14 +331,25 @@ export default function ProfessionalDetails({
           ),
         )}
       </View>
-      <View>
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10}}>
+        <CustomButton
+          title="Refresh Data"
+          bgColor="#4CAF50" // Green background
+          textColor="#FFF" // White text
+          borderColor="#4CAF50" // Green border
+          borderWidth={1}
+          borderRadius={30}
+          width={wp(35)}
+          onPress={refreshAllData}
+        />
         <CustomButton
           title="Save Changes"
-          bgColor="#E72B4A" // Green background
+          bgColor="#E72B4A" // Red background
           textColor="#FFF" // White text
-          borderColor="#E72B4A" // Darker green border
-          borderWidth={1} // 2px border
+          borderColor="#E72B4A" // Red border
+          borderWidth={1}
           borderRadius={30}
+          width={wp(35)}
           onPress={submitForm}
         />
       </View>

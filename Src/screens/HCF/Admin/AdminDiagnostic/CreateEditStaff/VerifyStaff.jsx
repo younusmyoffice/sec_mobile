@@ -20,14 +20,17 @@ const VerifyStaff = () => {
   const {handleVerify} = useCommon();
   const routes = useRoute();
   const {data, routePath} = routes.params;
-  console.log(data);
+  console.log('🔍 VerifyStaff - Received data:', data);
+  console.log('🔍 VerifyStaff - Route path:', routePath);
   const navigation = useNavigation();
   const [isSuccess, setisSuccess] = useState(false);
-  const [title, settitle] = useState('Verify Mobile No');
+  const [title, settitle] = useState('Verify Email');
   const [verifyOtp, setVerifyOtp] = useState({ 
     email: data?.email,
     activation_code: 0,
   });
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   // const handleVerify = async () => {
   //   try {
   //     setLoad(false);
@@ -44,11 +47,34 @@ const VerifyStaff = () => {
   //   }
   // };
   const handleSuccess = () => {
+    console.log('✅ Verification successful, navigating to:', routePath);
     navigation.navigate(routePath);
   };
 
-  console.log(typeof verifyOtp.code);
-  console.log(verifyOtp);
+  const handleVerifyOtp = async () => {
+    if (!verifyOtp.activation_code || verifyOtp.activation_code === 0) {
+      setErrorMessage('Please enter the OTP');
+      return;
+    }
+
+    setIsVerifying(true);
+    setErrorMessage('');
+
+    try {
+      console.log('🔐 Attempting to verify OTP:', verifyOtp);
+      await handleVerify(verifyOtp, setisSuccess, isSuccess, settitle);
+      console.log('✅ OTP verification successful');
+    } catch (error) {
+      console.error('❌ OTP verification failed:', error);
+      setErrorMessage('Invalid OTP. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  console.log('🔍 Current verifyOtp:', verifyOtp);
+  console.log('🔍 Is verifying:', isVerifying);
+  console.log('🔍 Error message:', errorMessage);
   return (
     <ScrollView style={{backgroundColor: '#fff'}}>
       <SafeAreaView>
@@ -149,6 +175,20 @@ const VerifyStaff = () => {
                   />
                 </View>
                 <View style={{marginTop: '10%'}}>
+                  {errorMessage ? (
+                    <View style={{marginBottom: 20}}>
+                      <Text
+                        style={{
+                          color: '#E72B4A',
+                          fontSize: hp(1.8),
+                          textAlign: 'center',
+                          fontFamily: 'Poppins-Medium',
+                        }}>
+                        {errorMessage}
+                      </Text>
+                    </View>
+                  ) : null}
+                  
                   <View style={{gap: 30}}>
                     <Text
                       style={{
@@ -166,13 +206,14 @@ const VerifyStaff = () => {
                       marginTop: '10%',
                     }}>
                     <CustomButton
-                      title="Continue"
-                      bgColor={'#E72B4A'}
+                      title={isVerifying ? "Verifying..." : "Continue"}
+                      bgColor={isVerifying ? '#ccc' : '#E72B4A'}
                       fontfamily={'Poppins-Medium'}
                       borderRadius={20}
                       textColor={'white'}
                       width={wp(50)}
-                      onPress={()=>handleVerify(verifyOtp,setisSuccess,isSuccess,settitle)}
+                      onPress={handleVerifyOtp}
+                      disabled={isVerifying}
                     />
                   </View>
                 </View>

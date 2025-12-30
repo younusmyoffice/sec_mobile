@@ -22,7 +22,7 @@ const TimeRangePicker = ({ Type, startTime, endTime, onStartTimeChange, onEndTim
 
   // Handle the time selection
   const handleConfirm = (date) => {
-    const formattedTime = format(date, 'HH:mm:ss:ms'); // Format to 12-hour AM/PM
+    const formattedTime = format(date, 'HH:mm:ss'); // 24-hour format with seconds
 
     if (isStartTime) {
       onStartTimeChange(formattedTime); // Update the parent state for start time

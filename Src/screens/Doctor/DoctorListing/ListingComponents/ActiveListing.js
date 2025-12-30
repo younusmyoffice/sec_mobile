@@ -7,7 +7,7 @@ import { useCommon } from '../../../../Store/CommonContext';
 import axiosInstance from '../../../../utils/axiosInstance';
 import Toast from 'react-native-toast-message';
 
-export default function ActiveListing() {
+export default function ActiveListing({ onEditListing }) {
   const [listingCards, setListingCards] = useState([]);  
   const [loading, setLoading] = useState(false);
   const [modalIndex, setModalIndex] = useState(null);  
@@ -15,17 +15,28 @@ export default function ActiveListing() {
   const { userId } = useCommon();
 
   const doctorListingCards = async () => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      console.log('⚠️ User not authenticated, skipping active listings fetch');
+      setError('Please login to view listings');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       const response = await axiosInstance.get(`doctor/DocListingPlanActive/${userId}`);
+      console.log('Active listings response:', response.data);
+      
       if (response.data && response.data.DocListingPlanActive) {
         setListingCards(response.data.DocListingPlanActive);
       } else {
-        setError('No listings available');
+        setError('No active listings available');
       }
     } catch (err) {
-      setError('Failed to fetch listings. Please try again later.');
+      console.error('Error fetching active listings:', err);
+      const errorMessage = err?.response?.data?.error || 'Failed to fetch listings. Please try again later.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -36,46 +47,97 @@ export default function ActiveListing() {
   }, []);
 
   const handleDeactivateListing = async (doctorListId) => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      Toast.show({
+        type: 'error',
+        text1: 'Authentication Error',
+        text2: 'Please login to manage listings',
+      });
+      return;
+    }
+
     setLoading(true);
-    setError(null);  // Reset error state before deactivation
+    setError(null);
     try {
+      console.log('Deactivating listing:', { doctor_id: userId, doctor_list_id: doctorListId });
+      
       const response = await axiosInstance.post(
         `doctor/docListingActiveDeactive`,
         {
-          doctor_id: userId,
-          doctor_list_id: doctorListId, // Pass the doctor list ID
+          doctor_id: parseInt(userId),
+          doctor_list_id: parseInt(doctorListId),
           is_active: 0, // deactivated
         }
       );
-      console.log('Listing deactivated: ', response.data);
-      console.log('Listing deactivated: ', doctorListId);
-
-      // If deactivation is successful, update the state locally by removing the deactivated listing
-      // if (response.data && response.data.DocListingPlanActive) {
-      //   // Filter out the deactivated listing
-      //   const updatedListings = listingCards.filter(
-      //     item => item.doctor_list_id !== doctorListId
-      //   );
-      doctorListingCards();
-        // setListingCards(response.data.DocListingPlanActive); // Update state with filtered listings
-      // }
-
-      setModalIndex(null); // Close the modal after deactivation
+      
+      console.log('Listing deactivated successfully:', response.data);
+      
+      // Refresh the listings after successful deactivation
+      await doctorListingCards();
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Listing deactivated successfully',
+      });
+      
+      setModalIndex(null);
     } catch (error) {
       console.error('Error deactivating listing:', error);
-      setError('Failed to deactivate the listing. Please try again later.');
+      const errorMessage = error?.response?.data?.error || 'Failed to deactivate the listing. Please try again later.';
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMessage,
+      });
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
+  const handleEditListing = (listingData) => {
+    console.log('📝 Opening edit mode for listing:', listingData);
+    if (onEditListing) {
+      onEditListing(listingData);
+    } else {
+      Alert.alert('Error', 'Edit functionality not available');
+    }
+  };
+
   const handleDeleteListing = async (doctorListId) => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      Toast.show({
+        type: 'error',
+        text1: 'Authentication Error',
+        text2: 'Please login to manage listings',
+      });
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.post(`doctor/deleteDocListingPlan`, {
+      console.log('🗑️ Deleting listing:', { 
+        doctor_id: userId, 
         doctor_list_id: doctorListId,
-        doctor_id: userId,
+        doctor_id_type: typeof userId,
+        doctor_list_id_type: typeof doctorListId
       });
+      
+      const payload = {
+        doctor_list_id: parseInt(doctorListId),
+        doctor_id: parseInt(userId),
+      };
+      
+      console.log('📤 Delete payload:', payload);
+      
+      const response = await axiosInstance.post(`doctor/deleteDocListingPlan`, payload);
+
+      console.log('Delete response:', response.data);
 
       if (response.data && response.data.response) {
         Toast.show({
@@ -85,15 +147,24 @@ export default function ActiveListing() {
         });
 
         // Remove the deleted listing from state
-        setListingCards(prevListings => prevListings.filter(item => item.doctor_list_id !== doctorListId));
+        setListingCards(prevListings => 
+          prevListings.filter(item => item.doctor_list_id !== doctorListId)
+        );
       }
     } catch (error) {
       console.error('Error deleting listing:', error);
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.data?.message || 
+                          error?.message || 
+                          'Failed to delete the listing.';
+      
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: error.response?.data?.error || 'Failed to delete the listing.',
+        text2: errorMessage,
       });
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setModalIndex(null);
@@ -135,6 +206,17 @@ export default function ActiveListing() {
 
             <View style={{ gap: 10, justifyContent: 'space-evenly', flexDirection: 'row', alignItems: 'center', marginTop: 25 }}>
               <CustomButton
+                title="Edit"
+                bgColor={'#E72B4A'}
+                borderRadius={30}
+                textColor={'white'}
+                fontSize={14}
+                fontWeight={'bold'}
+                width={wp(25)}
+                onPress={() => handleEditListing(item)}
+              />
+
+              <CustomButton
                 title="Deactivate"
                 bgColor={'#fff'}
                 borderRadius={30}
@@ -147,7 +229,6 @@ export default function ActiveListing() {
                 onPress={() => handleDeactivateListing(item.doctor_list_id)}
               />
 
-              {/* 🔥 Changed "Edit" button to "Delete" button */}
               <CustomButton
                 title="Delete"
                 bgColor={'#FF0000'}
@@ -155,7 +236,7 @@ export default function ActiveListing() {
                 textColor={'white'}
                 fontSize={14}
                 fontWeight={'bold'}
-                width={wp(35)}
+                width={wp(25)}
                 onPress={() => handleDeleteListing(item.doctor_list_id)}
               />
 
@@ -187,7 +268,10 @@ export default function ActiveListing() {
           </View>
         ))
       ) : (
-        <Text>No listings available</Text>
+        <View style={styles.noListingContainer}>
+          <Text style={styles.noListingText}>No active listings available</Text>
+          <Text style={styles.noListingSubText}>Create a new listing to get started</Text>
+        </View>
       )}
 
       {/* Toast Notification */}
@@ -250,5 +334,13 @@ const styles = StyleSheet.create({
     color: '#787579',
     fontSize: 16,
     fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+  },
+  noListingSubText: {
+    color: '#787579',
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+    marginTop: 5,
   },
 });

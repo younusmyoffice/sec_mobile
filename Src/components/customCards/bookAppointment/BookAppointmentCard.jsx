@@ -12,6 +12,7 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
+import {getProfileImageSource, handleImageError, handleImageLoad} from '../../../utils/imageUtils';
 
 const BookAppointmentCard = ({
   firstname,
@@ -34,9 +35,11 @@ const BookAppointmentCard = ({
           <View style={{flexDirection: 'row', gap: 10}}>
             <View>
               <Image
-                source={{uri: profile_picture && profile_picture}}
-                // source={require('../../../assets/NoAppointment.png')}
-            style={{width: wp(25), height: hp(15),resizeMode:'cover'}}
+                source={getProfileImageSource(profile_picture)}
+                onLoad={handleImageLoad}
+                onError={(error) => handleImageError(error)}
+                style={{width: wp(25), height: hp(15),resizeMode:'cover'}}
+                defaultSource={require('../../../assets/images/CardDoctor1.png')}
               />
             </View>
             <View style={{gap: hp(1)}}>

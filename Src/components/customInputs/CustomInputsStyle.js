@@ -94,7 +94,70 @@ const styles = StyleSheet.create({
     // fontSize: 20
     color: '#AEAAAE',
   },
-  
+
+  // Combined Mobile Input Styles
+  combinedInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomColor: '#AEAAAE',
+    borderBottomWidth: 1,
+    borderRadius: 5,
+    backgroundColor: 'white',
+  },
+  dialingCodeContainer: {
+    flex: 0.3,
+    marginRight: 10,
+  },
+  dialingCodeDropdown: {
+    height: 50,
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
+  },
+  mobileInputContainer: {
+    flex: 0.6,
+  },
+  mobileInput: {
+    height: 50,
+    paddingVertical: 15,
+    paddingHorizontal: 5,
+    fontFamily: 'Poppins-Regular',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
+  },
+  loadingContainer: {
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    borderBottomColor: '#AEAAAE',
+    borderBottomWidth: 1,
+    borderRadius: 5,
+  },
+  loadingText: {
+    marginLeft: 10,
+    color: '#666',
+  },
+  rightIconContainer: {
+    paddingRight: 10,
+  },
+  errorIcon: {
+    fontSize: 16,
+  },
+  errorContainer: {
+    marginTop: 5,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+  },
+  inputSearchStyle: {
+    height: 40,
+    fontSize: 16,
+  },
+  iconStyle: {
+    width: 20,
+    height: 20,
+  },
 });
 
 export default styles;

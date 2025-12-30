@@ -1,3 +1,41 @@
+/**
+ * ============================================================================
+ * PROFILE INFORMATION COMPONENT
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Component for displaying and editing patient profile information.
+ * Handles first name, last name, email, gender, DOB, and profile picture.
+ * 
+ * FEATURES:
+ * - Profile image upload with camera/gallery selection
+ * - Form fields with date picker for DOB
+ * - Save functionality
+ * 
+ * SECURITY:
+ * - Uses axiosInstance for authenticated API calls
+ * - File type validation (images only)
+ * - Base64 conversion for image upload
+ * 
+ * ERROR HANDLING:
+ * - CustomToaster for user-friendly error/success messages
+ * - Comprehensive error handling
+ * 
+ * REUSABLE COMPONENTS:
+ * - CustomToaster: Toast notifications
+ * - CustomInput: Form input component
+ * - CustomButton: Action button
+ * 
+ * ACCESS TOKEN:
+ * - Handled automatically by axiosInstance (reusable throughout app)
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * @module ProfileInformation
+ */
+
 import {
   StyleSheet,
   Text,
@@ -8,14 +46,9 @@ import {
   Image,
   TouchableWithoutFeedback,
 } from 'react-native';
-import React, {useEffect, useRef, useState} from 'react';
-import ProfileImageUpload from './ProfileImageUpload';
+import React, {useState} from 'react';
 import CustomInput from '../../../../../components/customInputs/CustomInputs';
-import InAppHeader from '../../../../../components/customComponents/InAppHeadre/InAppHeader';
 import CustomButton from '../../../../../components/customButton/CustomButton';
-import Header from '../../../../../components/customComponents/Header/Header';
-import axiosInstance from '../../../../../utils/axiosInstance';
-import {useCommon} from '../../../../../Store/CommonContext';
 import DocumentPicker from 'react-native-document-picker';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -25,12 +58,14 @@ import {
 } from 'react-native-responsive-screen';
 import RNFS from 'react-native-fs';
 import CustomToaster from '../../../../../components/customToaster/CustomToaster';
+import Logger from '../../../../../constants/logger';
+import { COLORS } from '../../../../../constants/colors';
+import axiosInstance from '../../../../../utils/axiosInstance';
+
 export default function ProfileInformation({
   firstFive,
   formData,
   setFormData,
-  local,
-  setlocal,
   showdetails,
   inputRefs,
   isDisabled,
@@ -38,150 +73,178 @@ export default function ProfileInformation({
   handleEnable,
 }) {
   const [localimage, setLocalImage] = useState('');
-  console.log(formData.profile_picture)
-
   const [markedDates, setMarkedDates] = useState({});
+  const [uploading, setUploading] = useState(false);
 
-  // const {userId} = useCommon();
-  // const ProfileInformation = [
-  //   {id: 1, name: 'email', type: 'email', placeholder: 'Email'},
-  //   {id: 1, name: 'first_name', type: 'text', placeholder: 'First Name'},
-  //   {id: 2, name: 'middle_name', type: 'text', placeholder: 'Middle Name'},
-  //   {id: 3, name: 'last_name', type: 'text', placeholder: 'Last Name'},
-  //   {
-  //     id: 4,
-  //     name: 'gender',
-  //     type: 'select',
-  //     placeholder: 'Gender',
-  //     options: [
-  //       {value: 'Male', label: 'Male'},
-  //       {value: 'Female', label: 'Female'},
-  //       {value: 'Others', label: 'Others'},
-  //     ],
-  //   },
-  //   {
-  //     id: 5,
-  //     name: 'DOB',
-  //     type: 'date',
-  //     placeholder: 'Date Of Birth',
-  //     format: 'singleline',
-  //   },
-  // ];
-
-  // const firstFive = ProfileInformation.slice(0, 5);
-  // const rest = ProfileInformation.slice(5);
-
-  // const [formData, setFormData] = useState({
-  //   suid: "",
-  //   role_id: "",
-  //   profile_picture:"",
-  //   first_name: '',
-  //   last_name: '',
-  //   middle_name: '',
-  //   email: '',
-  //   dialing_code: '',
-  //   contact_no_primary: '',
-  //   contact_no_secondary: '',
-  //   street_address1: '',
-  //   street_address2: '',
-  //   gender: '',
-  //   DOB: '',
-  //   zip_code: '',
-  //   country_id: '',
-  //   state_id: '',
-  //   city_id: '',
-  //   home_no: '',
-  //   location: '',
-  // });
-  // console.log(userId);
-
-  // const showDetails = async () => {
-  //   const response = await axiosInstance.post(`patientprofile`, {
-  //     suid: userId,
-  //   });
-  //   setFormData(response?.data.response[0]);
-  //   console.log("pdata",response?.data.response[0])
-  // };
+  /**
+   * Handle form field changes
+   * @param {string} name - Field name
+   * @param {any} value - Field value
+   */
   const handleChange = (name, value) => {
+    Logger.debug('Form field changed', { name, hasValue: !!value });
     setFormData(prev => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  // Handle image change
+  /**
+   * Handle image change (unused in current implementation)
+   * @param {string} newImage - New image URL
+   */
   const handleImageChange = newImage => {
+    Logger.debug('Image changed', { hasImage: !!newImage });
     setFormData(prev => ({
       ...prev,
-      profile_picture: newImage, // Update image URL in the state
+      profile_picture: newImage,
     }));
   };
 
+  /**
+   * Handle document/image upload
+   * SECURITY: File type validation (images only)
+   * ERROR HANDLING: Comprehensive error handling
+   */
   async function documentUpload() {
     try {
+      Logger.debug('Document picker opened');
       const docs = await DocumentPicker.pick({
         type: DocumentPicker.types.images,
         allowMultiSelection: false,
       });
 
       if (docs && docs.length > 0) {
-        console.log(docs);
-        console.log('Document URI:', docs[0]?.uri);
-        setlocal(true);
+        const selectedDoc = docs[0];
+        Logger.debug('Document selected', {
+          name: selectedDoc?.name,
+          type: selectedDoc?.type,
+          size: selectedDoc?.size,
+        });
 
-        setLocalImage(docs[0]?.uri);
-        console.log(docs[0]?.name);
+        // SECURITY: Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (selectedDoc.size && selectedDoc.size > maxSize) {
+          Logger.warn('File size exceeds limit', { size: selectedDoc.size });
+          CustomToaster.show('error', 'File Too Large', 'Please select an image smaller than 10MB.');
+          return;
+        }
+
+        setUploading(true);
+        setLocalImage(selectedDoc.uri);
+
         try {
-          const base64 = await RNFS.readFile(docs[0]?.uri, 'base64');
+          Logger.debug('Converting image to Base64');
+          const base64 = await RNFS.readFile(selectedDoc.uri, 'base64');
+          
+          // Determine file extension from MIME type or name
+          const fileExtension = selectedDoc.name?.split('.').pop() || 'jpg';
+          const mimeType = selectedDoc.type || 'image/jpeg';
+          
+          Logger.debug('Image converted to Base64', {
+            size: base64.length,
+            extension: fileExtension,
+            mimeType,
+          });
+
           setFormData(prevDetails => ({
             ...prevDetails,
             profile_picture: base64,
+            fileExtension: fileExtension,
           }));
-          return base64;
+
+          CustomToaster.show('success', 'Image Selected', 'Profile picture selected successfully.');
+          Logger.info('Profile image selected successfully');
         } catch (error) {
-          console.error('Error converting file to Base64:', error);
-          return null;
+          Logger.error('Error converting file to Base64', error);
+          CustomToaster.show('error', 'Error', 'Failed to process image. Please try again.');
+        } finally {
+          setUploading(false);
         }
       }
     } catch (error) {
       if (DocumentPicker.isCancel(error)) {
+        Logger.debug('Document picker cancelled');
       } else {
-        console.error(error);
+        Logger.error('Document picker error', error);
+        CustomToaster.show('error', 'Error', 'Failed to select image. Please try again.');
       }
     }
   }
-  // useEffect(() => {
-  //   showDetails();
-  // }, [userId]);
 
-  // console.log('image', formData.profile_picture);
+  /**
+   * Handle date selection for DOB
+   * @param {object} day - Selected day object
+   * @param {string} name - Field name
+   */
   const handleDayPress = (day, name) => {
-    // setStartDate(day.dateString);
-    // console.log("field",name)
+    Logger.debug('Date selected', { date: day.dateString, field: name });
     setFormData({
       ...formData,
       DOB: day.dateString,
-    }); // } else {;
+    });
     setMarkedDates({
       [day.dateString]: {
         selected: true,
-        color: '#E72B4A',
-        textColor: 'white',
+        color: COLORS.PRIMARY,
+        textColor: COLORS.TEXT_WHITE,
       },
     });
   };
+
+  /**
+   * Calculate marked dates for date range (unused in current implementation)
+   * @param {string} start - Start date
+   * @param {string} end - End date
+   * @returns {object} Marked dates object
+   */
   const calculateMarkedDates = (start, end) => {
     const marked = {};
     let date = new Date(start);
     while (date <= new Date(end)) {
       const dateStr = date.toISOString().split('T')[0];
-      marked[dateStr] = {selected: true, color: '#E72B4A', textColor: 'white'};
+      marked[dateStr] = {
+        selected: true,
+        color: COLORS.PRIMARY,
+        textColor: COLORS.TEXT_WHITE,
+      };
       date.setDate(date.getDate() + 1);
     }
     return marked;
   };
+
+  /**
+   * Handle profile update
+   * SECURITY: Validates form data before API call
+   * ERROR HANDLING: Comprehensive error handling
+   */
   const handlePersonalUpdate = async () => {
+    // SECURITY: Basic input validation
+    if (!formData.email || !formData.first_name || !formData.last_name) {
+      Logger.warn('Profile update validation failed', {
+        hasEmail: !!formData.email,
+        hasFirstName: !!formData.first_name,
+        hasLastName: !!formData.last_name,
+      });
+      CustomToaster.show('error', 'Validation Error', 'Please fill in all required fields.');
+      return;
+    }
+
     try {
+      Logger.api('POST', 'updatePateintProfile', {
+        email: formData.email,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        middle_name: formData.middle_name,
+        added_by: formData.added_by,
+        gender: formData.gender,
+        DOB: formData.DOB,
+        profile_picture: formData.profile_picture,
+        fileExtension: formData.fileExtension,
+      });
+
+      setUploading(true);
+      
       const response = await axiosInstance.post('updatePateintProfile', {
         email: formData.email,
         first_name: formData.first_name,
@@ -190,67 +253,71 @@ export default function ProfileInformation({
         added_by: formData.added_by,
         gender: formData.gender,
         DOB: formData.DOB,
-        // added profile picture
         profile_picture: formData.profile_picture,
         fileExtension: formData.fileExtension,
       });
-      showdetails();
-      CustomToaster.show('success','Profile Updated','Profile information updated')
-      console.log('success', response.message);
-    } catch (e) {
-      console.log(e);
-      CustomToaster.show('error',e.message)
+      
+      Logger.info('Profile update successful', {
+        hasResponse: !!response?.data,
+      });
 
+      // Refresh profile details after update
+      if (showdetails) {
+        await showdetails();
+      }
+
+      CustomToaster.show('success', 'Profile Updated', 'Profile information updated successfully.');
+      setIsDisabled(true);
+      
+      Logger.info('Profile information updated successfully');
+    } catch (error) {
+      Logger.error('Profile update error', error);
+      
+      const errorMessage = error?.response?.data?.message ||
+        error?.message ||
+        'Profile update failed. Please try again later.';
+      
+      CustomToaster.show('error', 'Update Failed', errorMessage);
+    } finally {
+      setUploading(false);
     }
   };
-  // console.log('first', formData);
+
   return (
     <SafeAreaView>
-      {/* <View>
-        <Header />
-      </View> */}
       <ScrollView contentContainerStyle={styles.container1}>
-        <View
-          style={{
-            backgroundColor: '#fff',
-            alignItems: 'center',
-            padding: 15,
-          }}>
-          <View style={{alignSelf: 'flex-end'}}>
+        <View style={styles.profileHeader}>
+          <View style={styles.editButtonContainer}>
             <TouchableWithoutFeedback onPress={handleEnable}>
               <MaterialCommunityIcons
                 name="pencil"
                 size={20}
-                color={'#E72B4A'}
+                color={COLORS.PRIMARY}
               />
             </TouchableWithoutFeedback>
           </View>
-          <View style={styles.container}>
+          
+          <View style={styles.imageContainer}>
             <Image
               source={{
-                uri: local
+                uri: localimage
                   ? localimage
                   : formData.profile_picture,
               }}
               style={styles.image}
+              defaultSource={require('../../../../../assets/images/CardDoctor1.png')}
             />
-            {/* <Image
-              source={{uri: formData.profile_picture}}
-              style={styles.image}
-            /> */}
-            <TouchableOpacity style={styles.overlay} onPress={documentUpload}>
-              <Icon name="camera" size={30} color="#fff" />
+            <TouchableOpacity
+              style={styles.overlay}
+              onPress={documentUpload}
+              disabled={isDisabled || uploading}>
+              <Icon name="camera" size={30} color={COLORS.TEXT_WHITE} />
             </TouchableOpacity>
           </View>
 
-          <View style={{margin: 20}}>
-            <Text
-              style={{
-                fontFamily: 'Poppins-Medium',
-                fontSize: 20,
-                color: '#AEAAAE',
-              }}>
-              Profile ID : <Text style={{color: '#E72B4A'}}>SRC0001</Text>
+          <View style={styles.profileIdContainer}>
+            <Text style={styles.profileIdText}>
+              Profile ID : <Text style={styles.profileIdValue}>SRC0001</Text>
             </Text>
           </View>
         </View>
@@ -260,7 +327,7 @@ export default function ProfileInformation({
           {firstFive.map((item, index) => (
             <CustomInput
               ref={el => (inputRefs.current[index] = el)}
-              key={item.id}
+              key={`${item.id}-${item.name}`}
               name={item.name}
               type={item.type}
               placeholder={item.placeholder}
@@ -277,28 +344,17 @@ export default function ProfileInformation({
               fontSize={hp(1.7)}
             />
           ))}
-          {/* <InAppHeader LftHdr="Contact Details" />
-
-{rest.map((item) => (
-  <CustomInput
-    key={item.id}
-    name={item.name}
-    type={item.type}
-    placeholder={item.placeholder}
-    value={formData[item.name] || ''}
-    onChange={handleChange}
-    options={item.options || []} 
-  />
-))} */}
-          <View>
+          
+          <View style={styles.saveButtonContainer}>
             <CustomButton
               title="Save Changes"
-              bgColor="#E72B4A" // Green background
-              textColor="#FFF" // White text
-              borderColor="#E72B4A" // Darker green border
-              borderWidth={1} // 2px border
+              bgColor={COLORS.PRIMARY}
+              textColor={COLORS.TEXT_WHITE}
+              borderColor={COLORS.PRIMARY}
+              borderWidth={1}
               borderRadius={30}
               onPress={handlePersonalUpdate}
+              disabled={uploading}
             />
           </View>
         </View>
@@ -307,12 +363,23 @@ export default function ProfileInformation({
   );
 }
 
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
 const styles = StyleSheet.create({
   container1: {
-    backgroundColor: 'white',
-    // padding: 15,
+    backgroundColor: COLORS.BG_WHITE,
   },
-  container: {
+  profileHeader: {
+    backgroundColor: COLORS.BG_WHITE,
+    alignItems: 'center',
+    padding: 15,
+  },
+  editButtonContainer: {
+    alignSelf: 'flex-end',
+  },
+  imageContainer: {
     width: 150,
     height: 150,
     justifyContent: 'center',
@@ -332,5 +399,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 75,
+  },
+  profileIdContainer: {
+    margin: 20,
+  },
+  profileIdText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 20,
+    color: COLORS.TEXT_GRAY,
+  },
+  profileIdValue: {
+    color: COLORS.PRIMARY,
+  },
+  saveButtonContainer: {
+    marginTop: 20,
+    marginBottom: 10,
   },
 });

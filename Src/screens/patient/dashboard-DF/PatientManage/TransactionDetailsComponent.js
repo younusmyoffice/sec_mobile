@@ -1,61 +1,67 @@
+/**
+ * ============================================================================
+ * TRANSACTION DETAILS COMPONENT
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Display patient transaction history in a specialized transaction table.
+ * 
+ * FEATURES:
+ * - Display transactions with transaction ID, date/time, and amount
+ * - Specialized CustomTransactionTable component
+ * 
+ * SECURITY:
+ * - No direct API calls (data received via props from parent)
+ * - Safe data handling
+ * 
+ * REUSABLE COMPONENTS:
+ * - CustomTransactionTable: Specialized transaction table component
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * @module TransactionDetailsComponent
+ */
+
 import {
   SafeAreaView,
-  ScrollView,
   StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Image,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import React from 'react';
-import DateRangePicker from '../../../../components/callendarPicker/RangeDatePicker';
-import CustomButton from '../../../../components/customButton/CustomButton';
-import {
-  widthPercentageToDP as wp,
-  heightPercentageToDP as hp,
-} from 'react-native-responsive-screen';
 import CustomTransactionTable from '../../../../components/customTable/CustomTransactionTable';
+import Logger from '../../../../constants/logger';
+import { COLORS } from '../../../../constants/colors';
+
 const TransactionDetailsComponent = ({data}) => {
-  // console.log(data);
+  /**
+   * Table headers for transaction details
+   */
   const header = ['Transaction & ID', 'Date & Time', 'Amount'];
-  // const data = [
-  //   {
-  //     id: 1,
-  //     image: require('../../../../assets/Recieve.png'),
-  //     name: 'Appointment Payment',
-  //     datetime: '16-oct',
-  //     trans_id:'10101 1010',
-  //     price: 200.98,
-  //   },
-  //   {
-  //     id: 2,
-  //     image: require('../../../../assets/Recieve.png'),
-  //     name: 'Refund for Appointment',
-  //     datetime: '16-oct',
-  //     trans_id:'10101 1010',
-  //     price: 200.98,
-  //   },
-  //   {
-  //     id: 3,
-  //     image: require('../../../../assets/Send.png'),
-  //     name: 'Radiology Test ( Cat-1)',
-  //     datetime: '16-oct',
-  //     trans_id:'10101 1010',
-  //     price: 200.98,
-  //   },
-  // ];
+
+  Logger.debug('TransactionDetailsComponent rendered', {
+    dataCount: data?.length || 0,
+  });
 
   return (
-    <SafeAreaView>
-      {/* <DateRangePicker Type={'normal'} />s */}
-      {/* <CustomTable /> */}
+    <SafeAreaView style={styles.container}>
       <CustomTransactionTable
         header={header}
         textCenter={'center'}
-        data={data}
+        data={data || []}
       />
     </SafeAreaView>
   );
 };
+
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+});
+
 export default TransactionDetailsComponent;

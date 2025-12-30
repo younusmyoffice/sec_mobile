@@ -7,7 +7,7 @@ import axiosInstance from '../../../../../utils/axiosInstance';
 const Shared = () => {
 
   const [shared, setShared] = useState([]);
-  const [load, setLoad] = useState()
+  const [load, setLoad] = useState(false);
   const {userId} = useCommon();
 const header = [
   'Name/Booking ID',
@@ -19,16 +19,19 @@ const header = [
   // 'Action'
 ];
 const handleRecieved = async () => {
-  setLoad(true)
+  setLoad(true);
   try {
     const response = await axiosInstance.get(`hcf/reportShared/${userId}`);
-    console.log("reportShared data===", response.data.response);
-    setShared(response.data.response);
+    console.log("reportShared data===", response.data?.response);
+    const body = response?.data?.response;
+    // Normalize: API may return string like "Tests Not Found"; use []
+    const normalized = Array.isArray(body) ? body : [];
+    setShared(normalized);
   } catch (e) {
     console.log(e);
+    setShared([]);
   } finally {
-    setLoad(false)
-
+    setLoad(false);
   }
 };
 useEffect(() => {
@@ -56,6 +59,7 @@ useEffect(() => {
         rowDataCenter={true}
         textCenter={'center'}
         data={shared}
+        loading={load}
         // roundedBtn={'action'}
       />
     </View>

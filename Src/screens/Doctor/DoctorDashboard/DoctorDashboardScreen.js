@@ -1,3 +1,26 @@
+/**
+ * ============================================================================
+ * SCREEN: Doctor Dashboard
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Main dashboard screen for doctors showing appointment requests, counts, and
+ * notifications
+ * 
+ * SECURITY:
+ * - Uses axiosInstance (automatic token injection)
+ * - Input sanitization handled by axios interceptors
+ * - Error handling with user-friendly messages
+ * 
+ * FEATURES:
+ * - Appointment request management
+ * - Dashboard statistics (counts)
+ * - Notification display
+ * - Pull-to-refresh functionality
+ * 
+ * @module DoctorDashboardScreen
+ */
+
 import {
   RefreshControl,
   ScrollView,
@@ -5,77 +28,124 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
+  Image,
 } from 'react-native';
 import React, {useState, useEffect} from 'react';
-import CustomCountDisplayCard from '../../../components/customCountDisplayCard/CustomCountDisplayCard';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+
+// Components
+import CustomCountDisplayCard from '../../../components/customCountDisplayCard/CustomCountDisplayCard';
 import TopTabs from '../../../components/customComponents/TopTabs/TopTabs';
 import HeaderDoctor from '../../../components/customComponents/HeaderDoctor/HeaderDoctor';
 import CustomNotificationRoundedList from '../../../components/customNotificationRounded/CustomNotificationRoundedList';
 import AppointmentCard from '../../../components/customCards/appiontmentCard/CustomAppointmentCard';
-import axios from 'axios'; // Make sure axios is imported
-import {baseUrl} from '../../../utils/baseUrl'; // Ensure baseUrl is correctly set
 import Header from '../../../components/customComponents/Header/Header';
-import axiosInstance from '../../../utils/axiosInstance';
+import CustomLoader from '../../../components/customComponents/customLoader/CustomLoader';
+
+// Utils & Services
+import axiosInstance from '../../../utils/axiosInstance'; // SECURITY: Uses axiosInstance with auto token injection
 import {useCommon} from '../../../Store/CommonContext';
-import {useNavigation} from '@react-navigation/native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import {Image} from 'react-native';
 import {useAuth} from '../../../Store/Authentication';
+import CustomToaster from '../../../components/customToaster/CustomToaster'; // REUSABLE: Toast messages
+import Logger from '../../../constants/logger'; // UTILITY: Structured logging
+import {COLORS} from '../../../constants/colors'; // DESIGN: Color constants
 
 export default function DoctorDashboardScreen() {
+  // CONTEXT: Get user data from context providers
   const {userId} = useCommon();
   const {doctorDetails} = useAuth();
-  console.log('did', userId);
-  // State to hold the appointment counts
+  
+  Logger.debug('Doctor Dashboard initialized', { userId, hasDoctorDetails: !!doctorDetails });
+  
+  // STATE: Appointment count cards
   const [cards, setCards] = useState([
     {id: 1, count: '0', desc: 'Appointment Request'},
     {id: 2, count: '0', desc: 'Upcoming Appointments'},
     {id: 3, count: '0', desc: 'Completed'},
   ]);
 
-  // State for the active tab
+  // STATE: Active tab selection
   const [notificatonRequestSt, setNotificatonRequestSt] = useState('Request');
-  const [cardData, setCardData] = useState(true);
+  const [cardData, setCardData] = useState([]); // FIX: Changed from boolean to array
 
-  // State for loading and error
+  // STATE: Loading and error management
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch the dashboard data
+  /**
+   * API: Fetch appointment requests for doctor
+   * 
+   * SECURITY: Uses axiosInstance (automatic token injection)
+   * ERROR HANDLING: Comprehensive error handling with user feedback
+   * 
+   * @returns {Promise<void>}
+   */
   const doctorRequestAppointment = async () => {
     setLoading(true);
     setError(null); // Reset error state before the request
+    
     try {
-      console.log('Fetching appointment requests...123', userId);
+      Logger.api('POST', 'Doctor/AppointmentsRequests', { doctor_id: userId });
+      
       const response = await axiosInstance.post(`Doctor/AppointmentsRequests`, {
         doctor_id: userId,
         status_in_progress: 'in_progress',
       });
 
-      console.log('Request DoctorDashboard screen', response.data.response);
+      Logger.info('Appointment requests fetched successfully', { 
+        count: response?.data?.response?.length || 0 
+      });
 
-      if (response.data && response.data.response) {
-        setCardData(response.data.response); // Set the fetched appointment requests data
+      // ERROR HANDLING: Validate and handle response data
+      if (response?.data?.response && Array.isArray(response.data.response) && response.data.response.length > 0) {
+        setCardData(response.data.response);
       } else {
-        setError('No appointment requests available');
+        Logger.warn('No appointment requests found');
+        setCardData([]); // Set empty array for graceful empty state
       }
     } catch (err) {
-      console.error('Error fetching appointment requests:', err);
-      setError('Failed to fetch appointment requests. Please try again later.');
+      // ERROR HANDLING: Comprehensive error handling
+      const errorMessage = err?.response?.data?.message || 
+                          err?.response?.data?.error || 
+                          'Failed to fetch appointment requests. Please try again later.';
+      
+      Logger.error('Error fetching appointment requests', {
+        status: err?.response?.status,
+        message: errorMessage,
+      });
+      
+      setError(errorMessage);
+      
+      // REUSABLE TOAST: Show error message to user
+      CustomToaster.show('error', 'Error', errorMessage);
+      
+      // Set empty array on error for graceful fallback
+      setCardData([]);
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * API: Fetch dashboard statistics (appointment counts)
+   * 
+   * SECURITY: Uses axiosInstance (automatic token injection)
+   * PERFORMANCE: Concurrent API calls using Promise.all
+   * ERROR HANDLING: Comprehensive error handling
+   * 
+   * @returns {Promise<void>}
+   */
   const fetchDashboardData = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log('Fetching dashboard data...');
+      Logger.api('POST', 'Doctor/DocDashoardCount (3 concurrent calls)');
 
-      // Use Promise.all to fetch data concurrently
+      // PERFORMANCE: Use Promise.all to fetch data concurrently
       const [responseForInProgress, responseForBooked, responseForCompleted] =
         await Promise.all([
           axiosInstance.post(`Doctor/DocDashoardCount`, {
@@ -92,13 +162,19 @@ export default function DoctorDashboardScreen() {
           }),
         ]);
 
-      // Check if the responses are valid
+      // ERROR HANDLING: Validate responses and extract counts safely
       const inProgressCount =
         responseForInProgress?.data?.response?.[0]?.keyword_count || '0';
       const bookedCount =
         responseForBooked?.data?.response?.[0]?.keyword_count || '0';
       const completedCount =
         responseForCompleted?.data?.response?.[0]?.keyword_count || '0';
+
+      Logger.info('Dashboard data fetched successfully', {
+        inProgress: inProgressCount,
+        booked: bookedCount,
+        completed: completedCount,
+      });
 
       // Update the cards state with the fetched data
       setCards([
@@ -107,17 +183,43 @@ export default function DoctorDashboardScreen() {
         {id: 3, count: completedCount, desc: 'Completed'},
       ]);
     } catch (error) {
-      console.error('Error fetching doctor dashboard data:', error);
-      setError('Failed to fetch data. Please try again later.');
+      // ERROR HANDLING: Comprehensive error handling
+      const errorMessage = error?.response?.data?.message || 
+                          'Failed to fetch dashboard data. Please try again later.';
+      
+      Logger.error('Error fetching doctor dashboard data', {
+        status: error?.response?.status,
+        message: errorMessage,
+      });
+      
+      setError(errorMessage);
+      CustomToaster.show('error', 'Error', errorMessage);
     } finally {
       setLoading(false);
     }
   };
+  /**
+   * API: Accept appointment request
+   * 
+   * SECURITY: Uses axiosInstance (automatic token injection)
+   * ERROR HANDLING: Comprehensive error handling with user feedback
+   * SUCCESS MESSAGE: Shows success toast notification
+   * 
+   * @param {Object} ApiData - Appointment data
+   * @param {number} ApiData.appointment_id - Appointment ID
+   * @param {number} ApiData.patient_id - Patient ID
+   * @param {number} ApiData.doctor_id - Doctor ID
+   * @returns {Promise<void>}
+   */
   const acceptAppointment = async ApiData => {
     setLoading(true);
-    setError(null); // Reset the error state before making a new request
+    setError(null);
 
     try {
+      Logger.api('POST', 'Doctor/AppointmentsRequestsAccept', {
+        appointment_id: ApiData.appointment_id,
+      });
+
       const response = await axiosInstance.post(
         `Doctor/AppointmentsRequestsAccept`,
         {
@@ -129,45 +231,77 @@ export default function DoctorDashboardScreen() {
         },
       );
 
-      console.log('Appointment accepted successfully:', response.data.response);
+      Logger.info('Appointment accepted successfully', {
+        appointment_id: ApiData.appointment_id,
+      });
 
-      // Trigger re-render of the parent component to re-fetch appointment requests
+      // REUSABLE TOAST: Show success message
+      CustomToaster.show('success', 'Success', 'Appointment accepted successfully');
+
+      // Refresh appointment requests list
       doctorRequestAppointment();
     } catch (err) {
-      console.error('Error accepting appointment:', err);
+      // ERROR HANDLING: Comprehensive error handling
       const errorMessage =
         err?.response?.data?.message ||
         'Failed to accept appointment. Please try again later.';
-      setError(errorMessage); // Set a more descriptive error message
+      
+      Logger.error('Error accepting appointment', {
+        status: err?.response?.status,
+        message: errorMessage,
+      });
+      
+      setError(errorMessage);
+      
+      // REUSABLE TOAST: Show error message to user
+      CustomToaster.show('error', 'Error', errorMessage);
     } finally {
-      setLoading(false); // Always stop loading when the request completes
+      setLoading(false);
     }
   };
 
-  const [notificationData, setNotificationData] = useState(); // State for the description input
+  // STATE: Notification data
+  const [notificationData, setNotificationData] = useState([]);
 
-  // Function to handle API submission
+  /**
+   * API: Fetch doctor notifications
+   * 
+   * SECURITY: Uses axiosInstance (automatic token injection)
+   * ERROR HANDLING: Comprehensive error handling
+   * 
+   * @returns {Promise<void>}
+   */
   const notificationApi = async () => {
-    const payload = {
-      doctor_id: userId,
-    };
-
     try {
+      Logger.api('GET', `Doctor/DoctorNotification/${userId}`);
+
       const response = await axiosInstance.get(
         `Doctor/DoctorNotification/${userId}`,
       );
 
-      if (response.data.response) {
-        console.log('notification dataaa', response.data.response);
+      if (response?.data?.response && Array.isArray(response.data.response)) {
+        Logger.info('Notifications fetched successfully', {
+          count: response.data.response.length,
+        });
         setNotificationData(response.data.response);
       } else {
+        Logger.warn('No notifications found');
+        setNotificationData([]);
       }
     } catch (err) {
-      console.error('Error submitting terms:', err);
-      Alert.alert(
-        'Error',
-        'An error occurred while submitting terms. Please try again.',
-      );
+      // ERROR HANDLING: Comprehensive error handling
+      const errorMessage = err?.response?.data?.message ||
+                          'Failed to fetch notifications. Please try again.';
+      
+      Logger.error('Error fetching notifications', {
+        status: err?.response?.status,
+        message: errorMessage,
+      });
+      
+      // REUSABLE TOAST: Show error message (non-blocking)
+      CustomToaster.show('error', 'Error', errorMessage);
+      
+      setNotificationData([]);
     }
   };
 
@@ -205,7 +339,7 @@ export default function DoctorDashboardScreen() {
               marginVertical: 15,
               height: 110,
               borderWidth: 2,
-              borderColor: '#E72B4A',
+              borderColor: COLORS.PRIMARY, // DESIGN: Use color constant
               padding: 10,
               borderRadius: 20,
               alignItems: 'center',
@@ -289,7 +423,7 @@ export default function DoctorDashboardScreen() {
                 <MaterialCommunityIcons
                   name="pencil"
                   size={30}
-                  color="#E72B4A"
+                  color={COLORS.PRIMARY} // DESIGN: Use color constant
                 />
               </TouchableOpacity>
             </View>
@@ -351,8 +485,8 @@ export default function DoctorDashboardScreen() {
                       btnStatus="request" // Set the status for the button
                       // The state of the card (upcoming)
                       btnTitle="Accept" // The button title
-                      bgcolor="#E72B4A" // Background color of the button
-                      textColor="#fff" // Button text color
+                      bgcolor={COLORS.PRIMARY} // DESIGN: Use color constant
+                      textColor={COLORS.TEXT_WHITE} // DESIGN: Use color constant
                       isShowStatus={false} // Whether to show the status (set false for hiding)
                       menuList={modalList} // The menu items to show when the kebab menu is clicked
                       onPress={() => acceptAppointment(item)} // Pass the correct onPress handler
@@ -363,17 +497,22 @@ export default function DoctorDashboardScreen() {
                 );
               })
             ) : (
+              // EMPTY STATE: Show when no appointment requests available
               <View
                 style={{
                   justifyContent: 'center',
                   alignItems: 'center',
                   marginTop: 20,
+                  padding: 20,
                 }}>
-                <Image source={require('../../../assets/NoAppointment.png')} />
-                <Text style={{fontSize: 18, fontWeight: 'bold'}}>
-                  You don’t have any appointment requests
+                <Image 
+                  source={require('../../../assets/images/CardDoctor1.png')}
+                  style={{width: 150, height: 150, resizeMode: 'contain'}}
+                />
+                <Text style={[styles.emptyStateTitle, {marginTop: 20}]}>
+                  You don't have any appointment requests
                 </Text>
-                <Text style={{textAlign: 'center', marginVertical: 10}}>
+                <Text style={[styles.emptyStateDesc, {marginTop: 10}]}>
                   Add Listings to manage your schedule.
                 </Text>
               </View>
@@ -385,11 +524,12 @@ export default function DoctorDashboardScreen() {
   );
 }
 
+// DESIGN: Styles using color constants
 const styles = StyleSheet.create({
   notificationContainer: {
     borderWidth: 1,
     borderRadius: 8,
-    borderColor: '#E6E1E5',
+    borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
     padding: 15,
     marginBottom: 140,
     marginTop: 10,
@@ -397,8 +537,19 @@ const styles = StyleSheet.create({
   appointmentContainer: {
     borderWidth: 1.2,
     borderRadius: 16,
-    borderColor: '#E6E1E5',
+    borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
     padding: 15,
     marginTop: 10,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
+    textAlign: 'center',
+  },
+  emptyStateDesc: {
+    fontSize: 14,
+    color: COLORS.TEXT_SECONDARY, // DESIGN: Use color constant
+    textAlign: 'center',
   },
 });

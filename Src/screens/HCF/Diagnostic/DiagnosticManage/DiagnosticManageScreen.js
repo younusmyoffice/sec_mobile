@@ -1,4 +1,16 @@
-import {SafeAreaView, ScrollView, StyleSheet, Text, View} from 'react-native';
+/**
+ * ============================================================================
+ * DIAGNOSTIC MANAGE SCREEN
+ * ============================================================================
+ *
+ * PURPOSE:
+ * Tabbed view for Diagnostic Sales Activities and Audit Logs.
+ *
+ * NOTES:
+ * - No direct API calls here; child screens handle data fetching.
+ * - Uses COLORS for consistent styling and Logger in child screens.
+ */
+import {SafeAreaView, ScrollView, StyleSheet, View} from 'react-native';
 import React, {useState} from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import ClinicHeader from '../../../../components/customComponents/ClinicHeader/ClinicHeader';
@@ -6,6 +18,8 @@ import TopTabs from '../../../../components/customComponents/TopTabs/TopTabs';
 import DiagnosticSalesActivities from './DiagnosticSalesActivities/DiagnosticSalesActivities';
 import DiagnosticAuditLogs from './DiagnosticAuditLogs/DiagnosticAuditLogs';
 import Header from '../../../../components/customComponents/Header/Header';
+import Logger from '../../../../constants/logger';
+import { COLORS } from '../../../../constants/colors';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -16,14 +30,16 @@ export default function DiagnosticManageScreen() {
   const renderComponent = () => {
     switch (activeTab) {
       case 'Sale Activities':
-        return <DiagnosticSalesActivities/>
+        Logger.debug('DiagnosticManage: Rendering Sales Activities');
+        return <DiagnosticSalesActivities/>;
       case 'Audit':
-        return <DiagnosticAuditLogs/>
+        Logger.debug('DiagnosticManage: Rendering Audit Logs');
+        return <DiagnosticAuditLogs/>;
     
     }
   };
   return (
-    <ScrollView style={{backgroundColor: 'white'}}>
+    <ScrollView style={styles.scrollView}>
            <Header
         logo={require('../../../../assets/headerDiagonsis.jpeg')}
         notificationUserIcon={true}
@@ -33,8 +49,8 @@ export default function DiagnosticManageScreen() {
         onlybell={true}
         id={4}
       />
-      <SafeAreaView style={{backgroundColor: 'white'}}>
-        <View style={{padding: 15, gap: 10}}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
           <View>
             <TopTabs
               data={[
@@ -46,11 +62,25 @@ export default function DiagnosticManageScreen() {
               setActiveTab={setactiveTab}
             />
           </View>
-          <View style={{marginTop:'5%'}}>{renderComponent()}</View>
+          <View style={styles.componentContainer}>{renderComponent()}</View>
         </View>
       </SafeAreaView>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  scrollView: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  container: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  content: {
+    padding: 15,
+    gap: 10,
+  },
+  componentContainer: {
+    marginTop: '5%',
+  },
+});

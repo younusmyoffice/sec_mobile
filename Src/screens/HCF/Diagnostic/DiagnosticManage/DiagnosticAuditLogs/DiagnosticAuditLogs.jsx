@@ -1,9 +1,26 @@
-import { View, ActivityIndicator } from 'react-native';
+/**
+ * ============================================================================
+ * DIAGNOSTIC AUDIT LOGS
+ * ============================================================================
+ *
+ * PURPOSE:
+ * Display audit logs for diagnostic actions.
+ *
+ * SECURITY:
+ * - Uses axiosInstance for authenticated API calls.
+ * - Validates userId before API calls.
+ *
+ * ERROR HANDLING:
+ * - User feedback via CustomToaster.
+ */
+import { View } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import CustomTable from '../../../../../components/customTable/CustomTable';
-import { baseUrl } from '../../../../../utils/baseUrl';
+import axiosInstance from '../../../../../utils/axiosInstance';
 import { useCommon } from '../../../../../Store/CommonContext';
-import axios from 'axios';
+import CustomLoader from '../../../../../components/customComponents/customLoader/CustomLoader';
+import CustomToaster from '../../../../../components/customToaster/CustomToaster';
+import Logger from '../../../../../constants/logger';
 
 const DiagnosticAuditLogs = () => {
   const header = ['Name & ID', 'Action', 'TimeStamp', 'Status'];
@@ -13,23 +30,32 @@ const DiagnosticAuditLogs = () => {
 
   useEffect(() => {
     const fetchAuditLogs = async () => {
+      // SECURITY: Validate userId before API call
+      if (!userId || userId === 'null' || userId === 'undefined') {
+        Logger.error('Invalid userId for audit logs', { userId });
+        CustomToaster.show('error', 'Error', 'Invalid user session. Please login again.');
+        setDdata([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
-        console.log("Fetching audit logs...");
+        Logger.api('GET', `hcf/HcfAuditlogs/${userId}`);
+        const response = await axiosInstance.get(`hcf/HcfAuditlogs/${userId}`);
 
-        const response = await axios.get(`${baseUrl}hcf/DiagAuditlogs/${userId}`, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (response.data && response.data.response) {
-          console.log("Audit logs fetched successfully:", response.data.response);
-          setDdata(response.data.response); // Extracting data inside 'response'
+        const body = response?.data?.response;
+        if (Array.isArray(body)) {
+          setDdata(body);
+          Logger.info('Audit logs fetched', { count: body.length });
         } else {
-          console.warn("Received empty audit logs response");
+          Logger.warn('Empty or unexpected audit logs response');
           setDdata([]);
         }
       } catch (error) {
-        console.error("Error fetching audit logs:", error);
+        Logger.error('Audit logs fetch failed', error);
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch audit logs.';
+        CustomToaster.show('error', 'Error', errorMessage);
         setDdata([]);
       } finally {
         setLoading(false);
@@ -39,10 +65,10 @@ const DiagnosticAuditLogs = () => {
     if (userId) {
       fetchAuditLogs();
     }
-  }, [userId]); // Fetch data when userId changes
+  }, [userId]);
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#0000ff" />;
+    return <CustomLoader />;
   }
 
   return (

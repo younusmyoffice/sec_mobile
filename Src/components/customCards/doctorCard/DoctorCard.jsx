@@ -13,6 +13,7 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
+import { getProfileImageSource, handleImageError, handleImageLoad } from '../../../utils/imageUtils';
 const {width} = Dimensions.get('window');
 
 const DoctorCard = ({
@@ -27,18 +28,19 @@ const DoctorCard = ({
   profile_picture,
 }) => {
   console.log('profile', `${profile_picture}`);
-  const [imageUri, setimageUri] = useState(profile_picture);
+  const [imageError, setImageError] = useState(false);
+  
   const stars = Array.from({length: reviewstar}, (_, index) => index);
   return (
     <SafeAreaView style={[styles.card, {width: width * 0.9}]}>
       <TouchableWithoutFeedback onPress={onClick}>
         <View style={styles.cardbody}>
           <Image
-            source={{
-              uri: profile_picture && profile_picture,
-            }}
-            // onError={() => setimageUri("https://example.com/fallback-image.png")}
+            source={getProfileImageSource(profile_picture)}
+            onLoad={handleImageLoad}
+            onError={(error) => handleImageError(error, setImageError)}
             style={{width: wp(25), height: hp(15), resizeMode: 'cover'}}
+            defaultSource={require('../../../assets/images/CardDoctor1.png')}
           />
 
           <View style={styles.textContainer}>

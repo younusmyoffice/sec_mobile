@@ -8,6 +8,7 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
+import {getProfileImageSource, handleImageError, handleImageLoad} from '../../utils/imageUtils';
 
 const CustomReviewCard = ({reviwes}) => {
   console.log(reviwes)
@@ -38,8 +39,11 @@ const CustomReviewCard = ({reviwes}) => {
                 <View
                   style={{flexDirection: 'row', alignItems: 'center', gap: 5}}>
                   <Image
-                    source={{uri: rev?.profile_picture && rev?.profile_picture}}
+                    source={getProfileImageSource(rev?.profile_picture)}
+                    onLoad={handleImageLoad}
+                    onError={(error) => handleImageError(error)}
                     style={{width:wp(10),height:hp(5), resizeMode: 'cover',borderRadius:50}}
+                    defaultSource={require('../../assets/images/CardDoctor1.png')}
                   />
                   <Text
                     style={{

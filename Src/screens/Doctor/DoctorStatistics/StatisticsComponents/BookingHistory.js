@@ -1,255 +1,319 @@
+/**
+ * ============================================================================
+ * COMPONENT: Booking History
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Component for displaying doctor's booking history in a table format
+ * 
+ * SECURITY:
+ * - Uses axiosInstance (automatic token injection) ✅
+ * - No user input, read-only data display
+ * 
+ * ERROR HANDLING: ✅ Comprehensive
+ * - Loading states
+ * - Error messages
+ * - Empty state handling
+ * 
+ * @module BookingHistory
+ */
+
 import {
-  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import React, { useEffect, useState } from 'react';
-import DateRangePicker from '../../../../components/callendarPicker/RangeDatePicker';
+import React, {useEffect, useState} from 'react';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import axios from 'axios';
-import { baseUrl } from '../../../../utils/baseUrl';
-import { useCommon } from '../../../../Store/CommonContext';
+
+// Components
+import CustomLoader from '../../../../components/customComponents/customLoader/CustomLoader'; // REUSABLE: Loader component
+
+// Utils & Services
+import axiosInstance from '../../../../utils/axiosInstance'; // SECURITY: Auto token injection
+import {baseUrl} from '../../../../utils/baseUrl';
+import {useCommon} from '../../../../Store/CommonContext';
+import CustomToaster from '../../../../components/customToaster/CustomToaster'; // REUSABLE: Toast messages
+import Logger from '../../../../constants/logger'; // UTILITY: Structured logging
+import {COLORS} from '../../../../constants/colors'; // DESIGN: Color constants
 
 export default function BookingHistory() {
-  const [apiResponseData, setApiResponseData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const{userId}=useCommon();
+  const {userId} = useCommon();
 
+  // STATE: Booking history data and loading
+  const [apiResponseData, setApiResponseData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  /**
+   * API: Fetch booking history for doctor
+   * 
+   * SECURITY: Uses axiosInstance (automatic token injection)
+   * ERROR HANDLING: Comprehensive error handling
+   * 
+   * @returns {Promise<void>}
+   */
   const handleDeactivateListing = async () => {
+    // VALIDATION: Check if userId exists
+    if (!userId) {
+      const errorMsg = 'User ID is missing. Please log in again.';
+      Logger.error('User ID missing for booking history', { userId });
+      setError(errorMsg);
+      setLoading(false);
+      CustomToaster.show('error', 'Error', errorMsg);
+      return;
+    }
+
     setLoading(true);
-    setError(null);  // Reset error state before deactivation
+    setError(null);
+
     try {
-      const response = await axios.post(
+      Logger.api('POST', 'doctor/DocAppointmentHistoryId', { doctor_id: userId });
+
+      const response = await axiosInstance.post(
         `${baseUrl}doctor/DocAppointmentHistoryId`,
         {
-          doctor_id: userId, // Example doctor ID
-        }
+          doctor_id: userId,
+        },
       );
-      console.log('Booking history: ', response.data.response);
-      setApiResponseData(Array.isArray(response.data.response) ? response.data.response : []);
+
+      Logger.info('Booking history fetched successfully', {
+        hasData: !!response?.data,
+      });
+
+      // ERROR HANDLING: Handle different response structures
+      let bookingData = [];
+
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          bookingData = response.data;
+        } else if (response.data.response && Array.isArray(response.data.response)) {
+          bookingData = response.data.response;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          bookingData = response.data.data;
+        }
+      }
+
+      Logger.debug('Processed booking data', { count: bookingData.length });
+
+      setApiResponseData(bookingData);
     } catch (error) {
-      console.error('Error: ', error);
-      setError('Failed, please try again later.');
+      // ERROR HANDLING: Comprehensive error handling
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to load booking history. Please try again later.';
+
+      Logger.error('Error fetching booking history', {
+        status: error?.response?.status,
+        message: errorMessage,
+        error: error,
+      });
+
+      setError(errorMessage);
+      setApiResponseData([]);
+
+      // REUSABLE TOAST: Show error message
+      CustomToaster.show('error', 'Error', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
+  // EFFECT: Fetch booking history on mount
   useEffect(() => {
+    Logger.debug('BookingHistory component mounted', { userId });
     handleDeactivateListing();
-  }, []);
+  }, [userId]); // Include userId in dependencies
 
-  return (
-    <SafeAreaView style={{ flex: 1 }}>
-  {/* <DateRangePicker Type={'normal'} /> */}
-
-  {loading ? (
-    <Text style={{ textAlign: 'center', marginTop: 50 }}>Loading...</Text>
-  ) : apiResponseData.length === 0 ? (
-    <View style={styles.noDataContainer}>
-      <Text style={styles.noDataText}>No Doctor booking history</Text>
-    </View>
-  ) : (
-    <ScrollView
-      horizontal={true}
-      style={{ marginBottom: 20 }}
-      showsHorizontalScrollIndicator={false}>
-      <View style={styles.container}>
-        <View style={styles.tableContainer}>
-          <View style={styles.header}>
-            <Text style={[styles.headerText, styles.columnName]}>
-              Name & Details
-            </Text>
-            <Text style={[styles.headerText, styles.columnStatus]}>
-              Status
-            </Text>
-            <Text style={[styles.headerText, styles.columnDate]}>
-              Date & Time
-            </Text>
-            <Text style={[styles.headerText, styles.columnPackage]}>
-              Package
-            </Text>
-            <Text style={[styles.headerText, styles.columnAmount]}>
-              Amount
-            </Text>
-          </View>
-
-          <ScrollView>
-          {apiResponseData.map((data, index) => (
-  <View key={index} style={styles.card}>
-    
-    {/* Patient Name */}
-    <Text style={{ color: 'black', fontFamily: 'Poppins-SemiBold', fontSize: hp(1.8) }}>
-      {data.first_name} {data.middle_name} {data.last_name}
-    </Text>
-
-    {/* Appointment ID */}
-    <Text style={{ color: '#666', fontFamily: 'Poppins-Medium', fontSize: hp(1.6) }}>
-      Appointment ID: {data.appointment_id}
-    </Text>
-
-    {/* Appointment Date and Time */}
-    <Text style={{ color: '#666', fontFamily: 'Poppins-Medium', fontSize: hp(1.6) }}>
-      {data.appointment_date?.substring(0, 10)} | {data.appointment_time}
-    </Text>
-
-    {/* Plan Name and Duration */}
-    <Text style={{ color: '#666', fontFamily: 'Poppins-Medium', fontSize: hp(1.6) }}>
-      Plan: {data.plan_name} ({data.plan_duration})
-    </Text>
-
-    {/* Amount */}
-    <Text style={{ color: '#E72B4A', fontFamily: 'Poppins-Bold', fontSize: hp(1.8) }}>
-      ${data.amount}
-    </Text>
-
-  </View>
-))}
-
-          </ScrollView>
-        </View>
+  // LOADING STATE: Show reusable loader
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <CustomLoader />
+        <Text style={styles.loadingText}>Loading booking history...</Text>
       </View>
-    </ScrollView>
-  )}
-</SafeAreaView>
+    );
+  }
 
+  // ERROR STATE: Show error message
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.retryText} onPress={handleDeactivateListing}>
+          Tap to retry
+        </Text>
+      </View>
+    );
+  }
+
+  // EMPTY STATE: Show empty message
+  if (apiResponseData.length === 0) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.emptyText}>No booking history found</Text>
+      </View>
+    );
+  }
+
+  // SUCCESS STATE: Show booking history table
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        horizontal={true}
+        style={styles.horizontalScroll}
+        showsHorizontalScrollIndicator={false}>
+        <View style={styles.tableWrapper}>
+          <View style={styles.tableContainer}>
+            {/* TABLE HEADER */}
+            <View style={styles.header}>
+              <Text style={[styles.headerText, styles.columnName]}>
+                Name & Details
+              </Text>
+              <Text style={[styles.headerText, styles.columnStatus]}>
+                Status
+              </Text>
+              <Text style={[styles.headerText, styles.columnDate]}>
+                Date & Time
+              </Text>
+              <Text style={[styles.headerText, styles.columnPackage]}>
+                Package
+              </Text>
+              <Text style={[styles.headerText, styles.columnAmount]}>
+                Amount
+              </Text>
+            </View>
+
+            {/* TABLE ROWS */}
+            <ScrollView>
+              {apiResponseData.map((data, index) => (
+                <View key={index} style={styles.card}>
+                  {/* Patient Name */}
+                  <Text style={styles.nameText}>
+                    {data.first_name || ''} {data.middle_name || ''}{' '}
+                    {data.last_name || ''}
+                  </Text>
+
+                  {/* Appointment ID */}
+                  <Text style={styles.detailText}>
+                    Appointment ID: {data.appointment_id}
+                  </Text>
+
+                  {/* Appointment Date and Time */}
+                  <Text style={styles.detailText}>
+                    {data.appointment_date?.substring(0, 10) || 'N/A'} |{' '}
+                    {data.appointment_time || 'N/A'}
+                  </Text>
+
+                  {/* Plan Name and Duration */}
+                  <Text style={styles.detailText}>
+                    Plan: {data.plan_name || 'N/A'} ({data.plan_duration || 'N/A'})
+                  </Text>
+
+                  {/* Amount */}
+                  <Text style={styles.amountText}>${data.amount || '0'}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+// DESIGN: Styles using color constants
 const styles = StyleSheet.create({
-  container1: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  noDataContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: hp(60),
-  },
-  
-  noDataText: {
-    fontSize: hp(2),
-    color: 'black',
-    fontFamily: 'Poppins-Medium',
-  },
-  container2: {},
-  datePickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    justifyContent: 'space-evenly',
-  },
-  datePickerText: {
-    fontSize: 16,
-    color: 'black',
-    margin: 15,
-    justifyContent: 'space-evenly',
-  },
-  selectedDateText: {
-    fontSize: 16,
-    color: 'black',
-    marginLeft: 10,
-  },
-  transactionContainer: {
-    borderColor: '#939094',
-    borderWidth: 1,
-    width: '88%',
-    height: '70%',
-    borderRadius: 16,
-    alignSelf: 'center',
-    marginBottom: 10,
-  },
-  transactionContent: {
-    padding: '2%',
-    justifyContent: 'space-between',
-    flexDirection: 'column',
-    marginTop: 30,
-  },
-  noDataContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noDataImage: {
-    width: 220,
-    height: 150,
-    marginTop: 45,
-  },
-  noDataText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'red',
-    marginTop: 30,
-  },
-  bookAppointmentText: {
-    fontSize: 16,
-    color: 'gray',
-    marginTop: 10,
-  },
-
   container: {
     flex: 1,
-    padding: 10,
-    backgroundColor: '#fff',
-    height:hp(60),
-    paddingBottom:100
   },
-
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    minHeight: hp(60),
+  },
+  loadingText: {
+    marginTop: 10,
+    color: COLORS.TEXT_SECONDARY, // DESIGN: Use color constant
+    fontSize: hp(1.8),
+    fontFamily: 'Poppins-Medium',
+  },
+  errorText: {
+    color: COLORS.ERROR, // DESIGN: Use color constant
+    fontSize: hp(2),
+    fontFamily: 'Poppins-Medium',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  retryText: {
+    color: COLORS.PRIMARY, // DESIGN: Use color constant
+    fontSize: hp(1.6),
+    textDecorationLine: 'underline',
+    marginTop: 10,
+  },
+  emptyText: {
+    fontSize: hp(2),
+    color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
+    fontFamily: 'Poppins-Medium',
+    textAlign: 'center',
+  },
+  horizontalScroll: {
+    marginBottom: 20,
+  },
+  tableWrapper: {
+    flex: 1,
+    padding: 10,
+    backgroundColor: COLORS.BG_WHITE, // DESIGN: Use color constant
+    height: hp(60),
+    paddingBottom: 100,
+  },
   tableContainer: {
-    borderColor: '#AEAAAE',
+    borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
     borderWidth: 1,
     borderRadius: 12,
     width: 1000,
   },
-
   header: {
     flexDirection: 'row',
     height: 80,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderColor: '#AEAAAE',
+    borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
     justifyContent: 'space-between',
     paddingHorizontal: 20,
   },
   headerText: {
     fontWeight: '600',
-    left:15,
+    left: 15,
     fontSize: 16,
-    color: '#313033',
+    color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
     fontFamily: 'Poppins-Medium',
   },
-
-  verticalScroll: {
-    maxHeight: 400,
-  },
-
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderColor: '#AEAAAE',
+    borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
     height: hp(10),
     paddingHorizontal: 20,
     justifyContent: 'space-between',
   },
-
   columnName: {
     minWidth: 200,
   },
   columnStatus: {
     width: wp(25),
     justifyContent: 'center',
-alignItems:'center',
+    alignItems: 'center',
     textAlign: 'center',
   },
   columnDate: {
@@ -265,25 +329,19 @@ alignItems:'center',
     width: 100,
     justifyContent: 'center',
   },
-
   nameText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#313033',
+    color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: hp(1.8),
   },
-  GreyText: {
+  detailText: {
+    color: COLORS.TEXT_GRAY, // DESIGN: Use color constant
     fontFamily: 'Poppins-Medium',
-    color: '#939094',
-    fontSize: hp(1.7),
+    fontSize: hp(1.6),
   },
-
-  editIcon: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  amount: {
-    color: '#E72B4A',
-    fontFamily: 'Poppins-Medium',
+  amountText: {
+    color: COLORS.PRIMARY, // DESIGN: Use color constant
+    fontFamily: 'Poppins-Bold',
     fontSize: hp(1.8),
   },
 });

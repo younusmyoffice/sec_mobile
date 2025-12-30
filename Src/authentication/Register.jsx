@@ -1,3 +1,48 @@
+/**
+ * ============================================================================
+ * REGISTER SCREEN
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * User registration screen with mobile number, email, and password.
+ * Supports role-based registration (Patient, Doctor, Admin, Clinic, Diagnostic).
+ * 
+ * FEATURES:
+ * - Mobile number with dialing code selection
+ * - Email address input
+ * - Password input with validation
+ * - Role-based registration flow
+ * 
+ * SECURITY:
+ * - Uses axios for registration API (public endpoint)
+ * - Input validation and sanitization (handled by CustomInputs and useAuth)
+ * - XSS and SQL injection detection (handled by useAuth)
+ * 
+ * ERROR HANDLING:
+ * - CustomToaster for user-friendly error/success messages (via useAuth)
+ * - Form validation errors displayed inline
+ * 
+ * REUSABLE COMPONENTS:
+ * - CustomInputs: Form input with validation
+ * - CustomButton: Action button with loading state
+ * - CombinedMobileInput: Mobile number with dialing code
+ * - CustomToaster: Toast notifications (via useAuth)
+ * 
+ * ACCESS TOKEN:
+ * - Registration doesn't require authentication
+ * - After successful registration, user needs to verify email before login
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet from AuthenticationStyle.js
+ * 
+ * NAVIGATION:
+ * - Navigates to VerifyEmail after successful registration
+ * - Navigates back to Login screen
+ * 
+ * @module Register
+ */
+
 import {
   View,
   Text,
@@ -5,68 +50,101 @@ import {
   Image,
   ScrollView,
   TouchableWithoutFeedback,
+  StyleSheet,
 } from 'react-native';
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import authenticationStyle from './AuthenticationStyle';
 import CustomInputs from '../components/customInputs/CustomInputs';
 import CustomButton from '../components/customButton/CustomButton';
-import DialingCodeDropdown from '../components/customInputs/DialingCodeDropdown';
+import CombinedMobileInput from '../components/customInputs/CombinedMobileInput';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import axios from 'axios';
-import {baseUrl} from '../utils/baseUrl';
 import {validateField} from '../components/customInputs/FormValidation';
 import {useCommon} from '../Store/CommonContext';
 import {useAuth} from '../Store/Authentication';
+import Logger from '../constants/logger';
+import { COLORS } from '../constants/colors';
 
 const Register = () => {
-  const {handleRegister, isRegisterValid,setIsRegisterValid,isLogging} = useAuth();
+  const {handleRegister, isRegisterValid, setIsRegisterValid, isLogging} = useAuth();
 
   const navigation = useNavigation();
   const route = useRoute();
-  const {roleId} = route.params;
-  console.log(roleId);
+  const {roleId} = route.params || {};
+
   const [errors, setErrors] = useState({});
   const [registerData, setRegisterData] = useState({
     mobile: 0,
     email: '',
     password: '',
     dialing_code: '91', // Default to India's dialing code
-    // cpassword: '',
     role_id: roleId,
+    added_by: 'self', // Required field for backend
   });
 
-  console.log(registerData);
+  /**
+   * Handle form field changes
+   * SECURITY: Validates input using FormValidation
+   * @param {string} name - Field name
+   * @param {any} value - Field value
+   */
   const handleChange = useCallback(
     (name, value) => {
+      Logger.debug('Register field changed', { name, hasValue: !!value });
+      
       setRegisterData(prevState => ({
         ...prevState,
         [name]: value,
       }));
+      
       const error = validateField(name, value);
       setErrors(prev => ({...prev, [name]: error}));
       setIsRegisterValid(
         Object.values({...errors, [name]: error}).every(err => !err),
       );
     },
-    [],
+    [errors, setIsRegisterValid],
   );
+
+  /**
+   * Handle register button press
+   * SECURITY: Validates form before submitting
+   */
+  const handleRegisterPress = () => {
+    Logger.debug('Register button pressed', {
+      hasEmail: !!registerData.email,
+      hasPassword: !!registerData.password,
+      hasMobile: !!registerData.mobile,
+      roleId: registerData.role_id,
+      isFormValid: isRegisterValid,
+    });
+
+    // SECURITY: Form validation check
+    if (!isRegisterValid) {
+      Logger.warn('Register form validation failed');
+      return;
+    }
+
+    Logger.info('Initiating registration', {
+      email: registerData.email,
+      roleId: registerData.role_id,
+    });
+
+    handleRegister(registerData, roleId);
+  };
+
+  /**
+   * Register form fields configuration
+   */
   const registerField = [
     {
-      id: 2,
-      label: 'Mobile No',
-      name: 'mobile',
-      type: 'number',
-      placeholder: 'Mobile No',
-    },
-    {
-      id: 3,
+      id: 1,
       label: 'Email Address',
       name: 'email',
       type: 'email',
       placeholder: 'Email Address',
     },
     {
-      id: 4,
+      id: 2,
       label: 'Password',
       name: 'password',
       type: 'password',
@@ -74,12 +152,16 @@ const Register = () => {
     },
   ];
 
- 
-  
+  Logger.debug('Register component rendered', {
+    roleId,
+    isLogging,
+    isRegisterValid,
+  });
+
   return (
-    <ScrollView>
-      <SafeAreaView>
-        <View style={{gap: 50}}>
+    <ScrollView style={styles.scrollView}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.mainContainer}>
           <View style={authenticationStyle.container}>
             <View>
               <Image
@@ -90,28 +172,29 @@ const Register = () => {
             <Text style={authenticationStyle.signUp}>Sign Up</Text>
           </View>
 
-          <View style={{gap: 25}}>
+          <View style={styles.formContainer}>
             <View style={authenticationStyle.inputs}>
               <View>
-                {/* Dialing Code Dropdown */}
-                <DialingCodeDropdown
-                  label="Country & Dialing Code"
-                  value={registerData.dialing_code}
-                  onChange={handleChange}
-                  placeholder="Select Country"
+                {/* Mobile Number with Dialing Code */}
+                <CombinedMobileInput
+                  label="Mobile Number"
+                  dialingCodeValue={registerData.dialing_code}
+                  mobileValue={registerData.mobile}
+                  onDialingCodeChange={handleChange}
+                  onMobileChange={handleChange}
+                  onValidationChange={(field, error) => {
+                    setErrors(prev => ({...prev, [field]: error}));
+                    setIsRegisterValid(
+                      Object.values({...errors, [field]: error}).every(err => !err),
+                    );
+                  }}
                   fontSize={20}
                 />
-                {errors.dialing_code && (
-                  <Text style={{color: 'red', marginTop: 5, marginLeft: 10}}>
-                    {errors.dialing_code}
-                  </Text>
-                )}
                 
-                {/* Other form fields */}
+                {/* Email and Password Fields */}
                 {registerField.map(field => (
-                  <>
+                  <React.Fragment key={field.id}>
                     <CustomInputs
-                      key={field.name}
                       label={field.label}
                       type={field.type}
                       name={field.name}
@@ -125,42 +208,37 @@ const Register = () => {
                       eyeicon={field.logo}
                     />
                     {errors[field.name] && (
-                      <Text style={{color: 'red'}}>{errors[field.name]}</Text>
+                      <Text style={styles.errorText}>{errors[field.name]}</Text>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </View>
+              
               <CustomButton
                 title="Register"
-                bgColor={'#E72B4A'}
+                bgColor={COLORS.PRIMARY}
                 borderRadius={25}
-                textColor={'white'}
+                textColor={COLORS.TEXT_WHITE}
                 fontWeight={'bold'}
                 fontSize={15}
                 padding={8}
-                onPress={() => handleRegister(registerData, roleId)}
+                onPress={handleRegisterPress}
                 loading={true}
                 isFormValid={!isRegisterValid}
                 isLogging={isLogging}
-                
               />
             </View>
-            <View style={{gap: 30}}>
-              {/* <Text style={authenticationStyle.forgot}>Forgot Password</Text> */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  gap: 5,
-                }}>
-                <Text style={{color: 'black', fontSize: 19}}>
+            
+            <View style={styles.footerContainer}>
+              <View style={styles.loginContainer}>
+                <Text style={styles.loginText}>
                   i have an account
                 </Text>
                 <TouchableWithoutFeedback
                   onPress={() =>
                     navigation.navigate('Login', {role_id: roleId})
                   }>
-                  <Text style={authenticationStyle.forgot}>Login </Text>
+                  <Text style={styles.loginLink}>Login</Text>
                 </TouchableWithoutFeedback>
               </View>
             </View>
@@ -170,5 +248,48 @@ const Register = () => {
     </ScrollView>
   );
 };
+
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
+const styles = StyleSheet.create({
+  scrollView: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  container: {
+    backgroundColor: COLORS.BG_WHITE,
+    flex: 1,
+  },
+  mainContainer: {
+    gap: 50,
+  },
+  formContainer: {
+    gap: 25,
+  },
+  footerContainer: {
+    gap: 30,
+  },
+  errorText: {
+    color: COLORS.ERROR,
+    fontSize: 12,
+    marginTop: -5,
+    marginBottom: 5,
+  },
+  loginContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  loginText: {
+    color: COLORS.TEXT_PRIMARY,
+    fontSize: 19,
+  },
+  loginLink: {
+    fontSize: 19,
+    textAlign: 'center',
+    color: COLORS.PRIMARY,
+  },
+});
 
 export default Register;

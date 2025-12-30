@@ -2,10 +2,16 @@ import {View, Text, Image} from 'react-native';
 import React from 'react';
 import CustomButton from '../customButton/CustomButton';
 
-const AppointmentFailed = ({image, title, desc, btntitle,showBtn}) => {
+const AppointmentFailed = ({image, title, desc, btntitle, showBtn}) => {
   return (
-    <View style={{gap: 15}}>
-      <View style={{alignSelf: 'center'}}>{image}</View>
+    <View style={{gap: 15, padding: 20}}>
+      {/* FIX: Add width and height constraints to prevent oversized image */}
+      <View style={{alignSelf: 'center', width: 150, height: 150}}>
+        <Image 
+          source={require('../../assets/images/CardDoctor1.png')} 
+          style={{width: '100%', height: '100%', resizeMode: 'contain'}}
+        />
+      </View>
       <View style={{padding: 5, gap: 30}}>
         <Text
           style={{

@@ -1,24 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
-import DoctorProfileCard from '../../../../components/customCards/DoctorProfileCard/DoctorProfileCard';
 import CustomInput from '../../../../components/customInputs/CustomInputs';
 import CustomButton from '../../../../components/customButton/CustomButton';
-import axios from 'axios';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import { baseUrl } from '../../../../utils/baseUrl'; // Ensure this is imported
 import { useCommon } from '../../../../Store/CommonContext';
+import axiosInstance from '../../../../utils/axiosInstance';
 
-export default function TermsCondition({listingId}) {
+export default function TermsCondition({listingId, onListingCreated, editMode = false, existingListing = null, existingTerms = null}) {
   const [description, setDescription] = useState(''); // State for the description input
   const{userId}=useCommon();
 
+  // Handle existing terms data when in edit mode
+  useEffect(() => {
+    console.log('📝 TermsCondition useEffect triggered:', { editMode, existingTerms });
+    
+    if (editMode && existingTerms) {
+      console.log('📝 TermsCondition - existingTerms received:', existingTerms);
+      
+      // Handle different possible data structures
+      let termsText = '';
+      if (typeof existingTerms === 'string') {
+        termsText = existingTerms;
+      } else if (existingTerms.description) {
+        termsText = existingTerms.description;
+      } else if (existingTerms.terms_description) {
+        termsText = existingTerms.terms_description;
+      } else if (existingTerms.text) {
+        termsText = existingTerms.text;
+      }
+      
+      console.log('📝 TermsCondition - extracted terms text:', termsText);
+      if (termsText) {
+        setDescription(termsText);
+        console.log('📝 TermsCondition - description set to:', termsText);
+      } else {
+        console.log('📝 TermsCondition - no terms text found in:', existingTerms);
+      }
+    } else if (editMode) {
+      console.log('📝 TermsCondition - edit mode but no existingTerms provided');
+    }
+  }, [editMode, existingTerms]);
+
   // Function to handle API submission
   const submitTerms = async () => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      Alert.alert('Error', 'Please login to submit terms and conditions');
+      return;
+    }
+
     if (description.trim() === '') {
       Alert.alert('Error', 'Please enter the terms and conditions.');
+      return;
+    }
+
+    if (!listingId) {
+      Alert.alert('Error', 'Listing information missing. Please complete previous steps first.');
       return;
     }
 
@@ -30,17 +70,26 @@ export default function TermsCondition({listingId}) {
     console.log(" Payload for terms and condition",payload)
 
     try {
-      const response = await axios.post(`${baseUrl}createUpdatedoctorlisting/terms`, payload);
+      const response = await axiosInstance.post(`createUpdatedoctorlisting/terms`, payload);
 
       if (response.data.response) {
         console.log('t&c',response.data.response.termsConditions.description)
-        Alert.alert('Success', 'Terms and Conditions have been saved successfully!');
+        Alert.alert('Success', `Terms and Conditions have been ${editMode ? 'updated' : 'saved'} successfully!`, [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (onListingCreated) {
+                onListingCreated();
+              }
+            }
+          }
+        ]);
       } else {
-        Alert.alert('Error', 'Failed to save terms. Please try again.');
+        Alert.alert('Error', `Failed to ${editMode ? 'update' : 'save'} terms. Please try again.`);
       }
     } catch (err) {
       console.error('Error submitting terms:', err);
-      Alert.alert('Error', 'An error occurred while submitting terms. Please try again.');
+      Alert.alert('Error', `An error occurred while ${editMode ? 'updating' : 'submitting'} terms. Please try again.`);
     }
   };
 
@@ -81,7 +130,7 @@ export default function TermsCondition({listingId}) {
         /> */}
 
         <CustomButton
-          title="Next"
+          title={editMode ? "Update" : "Next"}
           bgColor={'#E72B4A'}
           fontfamily={'Poppins-SemiBold'}
           textColor={'white'}

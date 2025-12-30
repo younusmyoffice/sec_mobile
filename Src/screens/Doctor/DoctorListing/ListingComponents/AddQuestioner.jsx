@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -21,10 +21,29 @@ import { useCommon } from '../../../../Store/CommonContext';
 import CustomButton from '../../../../components/customButton/CustomButton';
 import InAppHeader from '../../../../components/customComponents/InAppHeadre/InAppHeader';
 
-export default function AddQuestioner({ setActiveTab, listingId }) {
+export default function AddQuestioner({ setActiveTab, listingId, editMode = false, existingListing = null, existingQuestions = [] }) {
   const [questions, setQuestions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { userId } = useCommon();
+
+  // Populate existing questions when in edit mode
+  useEffect(() => {
+    if (editMode && existingQuestions && existingQuestions.length > 0) {
+      console.log('📝 Populating existing questions:', existingQuestions);
+      
+      // Transform API data to match component's expected format
+      const transformedQuestions = existingQuestions.map((q, index) => ({
+        id: q.doctor_questions_id || `existing-${index}`, // Use API ID or fallback
+        questionDescription: q.question || '',
+        questionType: 'Short Answer', // Default type, could be enhanced
+        options: [q.ans_1 || '', q.ans_2 || '', q.ans_3 || '', q.ans_4 || ''].filter(opt => opt.trim() !== ''),
+        doctor_questions_id: q.doctor_questions_id, // Keep original ID for updates
+      }));
+      
+      console.log('📝 Transformed questions:', transformedQuestions);
+      setQuestions(transformedQuestions);
+    }
+  }, [editMode, existingQuestions]);
 
   const questionTypes = [
     'Short Answer',
@@ -127,6 +146,17 @@ export default function AddQuestioner({ setActiveTab, listingId }) {
   };
 
   const submitQuestions = async () => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      Alert.alert('Error', 'Please login to submit questions');
+      return;
+    }
+
+    if (!listingId) {
+      Alert.alert('Error', 'No listing selected. Please complete previous steps first.');
+      return;
+    }
+
     if (!validateQuestions()) return;
 
     setIsSubmitting(true);
@@ -140,19 +170,44 @@ export default function AddQuestioner({ setActiveTab, listingId }) {
         ans_2: q.options[1] || '',
         ans_3: q.options[2] || '',
         ans_4: q.options[3] || '',
+        doctor_questions_id: q.doctor_questions_id, // Include original ID for updates
       })),
     };
 
     try {
-      const response = await axiosInstance.post(
-        'createUpdatedoctorlisting/questionCreate',
-        payload
-      );
-      if (response.data?.response?.StatusCode === 200) {
-        Alert.alert('Success', 'Questions have been successfully submitted.');
-        setActiveTab('Terms & Condition');
+      let response;
+      if (editMode) {
+        // Update existing questions - we'll need to update each question individually
+        console.log('📝 Updating existing questions in edit mode');
+        for (const question of payload.questions) {
+          if (question.doctor_questions_id) {
+            // Update existing question
+            const updatePayload = {
+              doctor_list_id: listingId,
+              doctor_id: userId,
+              doctor_questions_id: question.doctor_questions_id,
+              question: question.question,
+              ans_1: question.ans_1,
+              ans_2: question.ans_2,
+              ans_3: question.ans_3,
+              ans_4: question.ans_4,
+            };
+            response = await axiosInstance.post('createUpdatedoctorlisting/questionUpdate', updatePayload);
+          } else {
+            // Create new question
+            response = await axiosInstance.post('createUpdatedoctorlisting/questionCreate', { questions: [question] });
+          }
+        }
+        Alert.alert('Success', 'Questions have been successfully updated.');
       } else {
-        throw new Error(response.data?.response?.body || 'Failed to submit questions.');
+        // Create new questions
+        response = await axiosInstance.post('createUpdatedoctorlisting/questionCreate', payload);
+        if (response.data?.response?.StatusCode === 200) {
+          Alert.alert('Success', 'Questions have been successfully submitted.');
+          setActiveTab('Terms & Condition');
+        } else {
+          throw new Error(response.data?.response?.body || 'Failed to submit questions.');
+        }
       }
     } catch (err) {
       const errorMessage =

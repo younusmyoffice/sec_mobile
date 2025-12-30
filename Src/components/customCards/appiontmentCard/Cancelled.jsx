@@ -44,7 +44,7 @@ const Cancelled = ({ data, loader }) => {
       <View>
         <AppointmentFailed
           image={
-            <Image source={require('../../../assets/NoAppointment.png')} />
+            <Image source={require('../../../assets/images/CardDoctor1.png')} />
           }
           title={'There are no Cancelled appointments.'}
           desc={''}

@@ -17,7 +17,7 @@ import CustomToaster from '../../../../../components/customToaster/CustomToaster
 import {useNavigation, useRoute} from '@react-navigation/native';
 const CreateLab = () => {
   const route = useRoute();
-  const {item, status} = route.params;
+  const {item, status} = route.params || {};
   const navigation = useNavigation();
   const {userId} = useAuth();
   const [dept, setDept] = useState([]);
@@ -29,8 +29,8 @@ const CreateLab = () => {
   const [endTime, setEndTime] = useState(item?.lab_working_time_to || null);
   const [markedDates, setMarkedDates] = useState({});
   const [addLab, setAddLab] = useState({
-    lab_dept_id: item.lab_department_id?.toString() || '',
-    hcf_id: userId.toString(),
+    lab_dept_id: item?.lab_department_id?.toString() || '',
+    hcf_id: userId ? userId.toString() : '',
     lab_working_days_from: item?.lab_working_days_from || '',
     lab_working_days_to: item?.lab_working_days_to || '',
     lab_description: item?.lab_description || '',
@@ -171,27 +171,49 @@ const CreateLab = () => {
   };
 
   const handleAddLab = async () => {
+    // Validate required fields
+    if (!addLab.lab_dept_id || !addLab.lab_working_days_from || !addLab.lab_working_days_to || !addLab.lab_working_time_from || !addLab.lab_working_time_to) {
+      CustomToaster.show('error', 'Missing Fields', 'Please fill in all required fields');
+      return;
+    }
+
     const add = addLab;
     const edit = {
-      exam_id: item?.exam_id.toString(),
+      exam_id: item?.exam_id?.toString(),
       exam_name: item?.exam_name,
       ...addLab,
     };
-    console.log('edit', edit);
+    
+    console.log('🔬 Lab Creation Debug:');
+    console.log('📋 Status:', status);
+    console.log('📦 Payload:', status === 'edit' ? edit : add);
+    
     try {
       const response = await axiosInstance.post(
         `hcf/addLabs`,
         status === 'edit' ? edit : add,
       );
-      console.log(response.data);
+      console.log('✅ Lab creation response:', response.data);
+      
       CustomToaster.show(
         'success',
-        status === 'edit' ? 'Lab Edited Succesfully' : 'Lab Added Sucessfully',
+        status === 'edit' ? 'Lab Edited Successfully' : 'Lab Added Successfully',
       );
       navigation.goBack();
     } catch (error) {
-      console.log(error);
-      CustomToaster.show('error', error);
+      console.error('❌ Lab creation failed:', error);
+      
+      let errorMessage = 'Failed to create lab. Please try again.';
+      
+      if (error.response?.data?.response?.body) {
+        errorMessage = error.response.data.response.body;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      CustomToaster.show('error', 'Lab Creation Failed', errorMessage);
     }
   };
   useEffect(() => {

@@ -42,34 +42,74 @@ export const createMeeting = async ({ token }) => {
 
 export const validateMeeting = async ({ meetingId, token }) => {
   const url = `${API_BASE_URL}/rooms/validate/${meetingId}`;
-console.log("mettiing id and token",meetingId, token)
+  console.log("🔍 [VIDEO SDK API] Validating Meeting", {
+    meetingId: meetingId,
+    meetingId_length: meetingId?.length,
+    meetingId_type: typeof meetingId,
+    url: url
+  });
+
+  // BUG FIX: Check if meeting ID format looks like VideoSDK format (xxxx-xxxx-xxxx)
+  // VideoSDK meeting IDs are typically in format: xxxx-xxxx-xxxx (alphanumeric with dashes)
+  const videosdkFormatRegex = /^[\w]{4}-[\w]{4}-[\w]{4}$/;
+  if (meetingId && !videosdkFormatRegex.test(meetingId)) {
+    console.warn('⚠️ [VIDEO SDK API] Meeting ID does not match VideoSDK format (xxxx-xxxx-xxxx)');
+    console.warn('⚠️ [VIDEO SDK API] Meeting ID:', meetingId);
+    console.warn('⚠️ [VIDEO SDK API] This might be an old/invalid meeting ID from database');
+    // Return error indicating invalid format
+    return { meetingId: null, err: 'Invalid meeting ID format. Please create a new meeting.' };
+  }
 
   const options = {
     method: "GET",
-    // headers: { Authorization: `Bearer ${token}` },
     headers: { Authorization: token, "Content-Type": "application/json" },
   };
 
-  // const result = await fetch(url, options)
-  //   .then((response) => response.json()) //result will have meeting id
-  //   .catch((error) => console.error("error", error));
+  try {
+    console.log('⏳ [VIDEO SDK API] Sending validation request...');
+    const response = await fetch(url, options);
+    
+    console.log('📥 [VIDEO SDK API] Response Status:', response.status);
+    console.log('📥 [VIDEO SDK API] Response OK:', response.ok);
 
-  // return result ? result.roomId === meetingId : false;
-  const response = await fetch(url, options)
-console.log(" meeting response", response);
-  if (response.status === 400) {
-    const data = await response.text()
-    return { meetingId: null, err: data }
-  }
+    if (response.status === 400) {
+      const data = await response.text();
+      console.error('❌ [VIDEO SDK API] Validation failed (400):', data);
+      return { meetingId: null, err: data || 'Room not found.' };
+    }
 
-  const data = await response.json()
-  console.log(" meetingdata response", response.json());
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('❌ [VIDEO SDK API] Validation failed:', response.status, errorText);
+      return { meetingId: null, err: `Validation failed: ${response.status}` };
+    }
 
-  if (data.roomId) {
+    const data = await response.json();
+    console.log('✅ [VIDEO SDK API] Validation Response Data:', data);
 
-    return { meetingId: data.roomId, err: null }
-  } else {
-    return { meetingId: null, err: data.error }
+    if (data.roomId) {
+      return { meetingId: data.roomId, err: null };
+    } else {
+      return { meetingId: null, err: data.error || 'Room not found.' };
+    }
+  } catch (error) {
+    console.error('❌ [VIDEO SDK API] Network/Request Error:', error);
+    console.error('❌ [VIDEO SDK API] Error Type:', error?.name);
+    console.error('❌ [VIDEO SDK API] Error Message:', error?.message);
+    
+    // BUG FIX: Handle network errors gracefully
+    if (error?.message === 'Network request failed' || error?.message?.includes('Network')) {
+      return { 
+        meetingId: null, 
+        err: 'Network error. Please check your internet connection and try again.' 
+      };
+    }
+    
+    // For other errors, return generic error
+    return { 
+      meetingId: null, 
+      err: error?.message || 'Failed to validate meeting. Please try again.' 
+    };
   }
 };
 // const response = await fetch(url, options)

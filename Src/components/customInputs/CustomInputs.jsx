@@ -24,7 +24,7 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import DateRangePicker from '../callendarPicker/RangeDatePicker';
-const CustomInput = ({
+const CustomInput = React.forwardRef(({
   label,
   type,
   name,
@@ -63,7 +63,7 @@ const CustomInput = ({
   fontFamily,
   datevalue,
   handleVerify
-}) => {
+}, ref) => {
   const [isPasswordVisible, setPasswordVisible] = useState(false);
 
   const togglePasswordVisibility = () => {
@@ -77,8 +77,12 @@ const CustomInput = ({
   const getMaxLength = () => {
     return getMaxLengthHelper(name, value);
   };
-  // console.log(type);
-  console.log('file', fileName);
+  
+  // Debug logging for file upload fields only
+  // if (type === 'file' && fileName) {
+  //   Logger.debug('File selected', { fileName });
+  // }
+  
   return (
     <View style={styles.container}>
       {type === 'select' ? (
@@ -132,6 +136,7 @@ const CustomInput = ({
         type === 'cardNumber' ? (
         <View style={styles.inputContainer}>
           <TextInput
+            ref={ref}
             value={value}
             name={name}
             type={type}
@@ -177,6 +182,7 @@ const CustomInput = ({
       ) : type === 'textarea' ? (
         <View style={{gap: 5}}>
           <TextInput
+            ref={ref}
             style={{
               borderWidth: 1,
               height: 120,
@@ -233,5 +239,6 @@ const CustomInput = ({
       ) : null}
     </View>
   );
-};
+});
+
 export default CustomInput;

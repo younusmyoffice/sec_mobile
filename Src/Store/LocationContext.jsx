@@ -228,17 +228,33 @@ const LocationProvider = ({children}) => {
   const fetchDoctors = async zipcodes => {
     setIsSearching(true);
     try {
-      const response = await axiosInstance.post('patient/doctornearme', {
+      // console.log('🔍 Fetching doctors with zipcodes:', zipcodes);
+      
+      // Validate zipcodes before making the request
+      if (!zipcodes || !Array.isArray(zipcodes) || zipcodes.length === 0) {
+        // console.log('⚠️ No valid zipcodes provided, skipping doctor fetch');
+        setDoctors([]);
+        return;
+      }
+
+      const requestPayload = {
         zipcodes: zipcodes,
         type: 'Good',
         page: 1,
         limit: 5,
-      });
-      console.log(response.data.response);
+      };
+      
+      // console.log('📡 Sending request to patient/doctornearme with payload:', requestPayload);
+      
+      const response = await axiosInstance.post('patient/doctornearme', requestPayload);
+      // console.log('✅ Doctors API response:', response.data);
       setDoctors(response.data.response || []);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching doctors:', error);
+      // Only log actual errors, not "no doctors found" responses
+      if (error.response?.status !== 400 || !error.response?.data?.error?.includes('No doctors')) {
+        console.error('❌ Error fetching doctors:', error);
+      }
       setDoctors([]);
     } finally {
       setIsSearching(false);

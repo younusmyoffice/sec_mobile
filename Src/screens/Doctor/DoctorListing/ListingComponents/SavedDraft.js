@@ -7,7 +7,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useCommon } from '../../../../Store/CommonContext';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
-export default function SavedDraft() {
+export default function SavedDraft({ onEditListing }) {
   const [listingCards, setListingCards] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalIndex, setModalIndex] = useState(null);
@@ -15,17 +15,28 @@ export default function SavedDraft() {
   const { userId } = useCommon();
 
   const doctorListingCards = async () => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      console.log('⚠️ User not authenticated, skipping inactive listings fetch');
+      setError('Please login to view listings');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       const response = await axiosInstance.get(`doctor/DocListingPlanDeactive/${userId}`);
+      console.log('Inactive listings response:', response.data);
+      
       if (response.data?.DocListingPlanDeactive) {
         setListingCards(response.data.DocListingPlanDeactive);
       } else {
-        setError('No listings available');
+        setError('No inactive listings available');
       }
     } catch (err) {
-      setError('Failed to fetch listings. Please try again later.');
+      console.error('Error fetching inactive listings:', err);
+      const errorMessage = err?.response?.data?.error || 'Failed to fetch listings. Please try again later.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -35,52 +46,89 @@ export default function SavedDraft() {
     doctorListingCards();
   }, [userId]);
 
+  const handleEditListing = (listingData) => {
+    console.log('📝 Opening edit mode for listing:', listingData);
+    if (onEditListing) {
+      onEditListing(listingData);
+    } else {
+      Alert.alert('Error', 'Edit functionality not available');
+    }
+  };
+
   const handleActivateListing = async (doctorListId) => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      Toast.show({
+        type: 'error',
+        text1: 'Authentication Error',
+        text2: 'Please login to manage listings',
+      });
+      return;
+    }
+
     setLoading(true);
-    setError(null);  // Reset error state before deactivation
+    setError(null);
     try {
-      console.log('Listing Activated: ',userId);
+      console.log('Activating listing:', { doctor_id: userId, doctor_list_id: doctorListId });
+      
       const response = await axiosInstance.post(
         `doctor/docListingActiveDeactive`,
         {
-          doctor_id: userId,
-          doctor_list_id: doctorListId, // Pass the doctor list ID
-          is_active: 1, // deactivated
+          doctor_id: parseInt(userId),
+          doctor_list_id: parseInt(doctorListId),
+          is_active: 1, // activated
         }
       );
 
-      console.log('List', userId );
-      console.log('List', doctorListId );
+      console.log('Listing activated successfully:', response.data);
 
-      console.log('Listing Activated:A ', response.data);
+      // Refresh the listings after successful activation
+      await doctorListingCards();
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Listing activated successfully',
+      });
 
-    
-      // if (response.data && response.data.DocListingPlanDeactive) {
-      //   // Filter out the deactivated listing
-      //   const updatedListings = listingCards.filter(
-      //     item => item.doctor_list_id !== doctorListId
-      //   );
-      doctorListingCards();
-
-        // setListingCards(response.data.DocListingPlanDeactive); // Update state with filtered listings
-      // }
-
-      setModalIndex(null); // Close the modal after deactivation
+      setModalIndex(null);
     } catch (error) {
-      console.error('Error deactivating listing:', error);
-      setError('Failed to deactivate the listing. Please try again later.');
+      console.error('Error activating listing:', error);
+      const errorMessage = error?.response?.data?.error || 'Failed to activate the listing. Please try again later.';
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMessage,
+      });
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
   const handleDeleteListing = async (doctorListId) => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      Toast.show({
+        type: 'error',
+        text1: 'Authentication Error',
+        text2: 'Please login to manage listings',
+      });
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
+      console.log('Deleting listing:', { doctor_id: userId, doctor_list_id: doctorListId });
+      
       const response = await axiosInstance.post(`doctor/deleteDocListingPlan`, {
-        doctor_list_id: doctorListId,
-        doctor_id: userId,
+        doctor_list_id: parseInt(doctorListId),
+        doctor_id: parseInt(userId),
       });
+
+      console.log('Delete response:', response.data);
 
       if (response.data.response === 'Records deleted successfully') {
         Toast.show({
@@ -89,11 +137,16 @@ export default function SavedDraft() {
           text2: 'Listing deleted successfully!',
         });
 
-        setListingCards(prevListings => prevListings.filter(item => item.doctor_list_id !== doctorListId));
+        setListingCards(prevListings => 
+          prevListings.filter(item => item.doctor_list_id !== doctorListId)
+        );
       }
     } catch (error) {
       console.error('Error deleting listing:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to delete listing. Please try again.';
+      const errorMessage = error?.response?.data?.error || 
+                          error?.response?.data?.message || 
+                          error?.message || 
+                          'Failed to delete listing. Please try again.';
 
       Toast.show({
         type: 'error',
@@ -139,6 +192,17 @@ export default function SavedDraft() {
 
             <View style={styles.buttonContainer}>
               <CustomButton
+                title="Edit"
+                bgColor={'#E72B4A'}
+                borderRadius={30}
+                textColor={'white'}
+                fontSize={14}
+                fontWeight={'bold'}
+                width={wp(25)}
+                onPress={() => handleEditListing(item)}
+              />
+
+              <CustomButton
                 title="Activate"
                 bgColor={'#fff'}
                 borderRadius={30}
@@ -147,7 +211,7 @@ export default function SavedDraft() {
                 textColor={'#E72B4A'}
                 fontSize={14}
                 fontWeight={'bold'}
-                width={wp(35)}
+                width={wp(25)}
                 onPress={() => handleActivateListing(item.doctor_list_id)}
               />
 
@@ -158,7 +222,7 @@ export default function SavedDraft() {
                 textColor={'white'}
                 fontSize={14}
                 fontWeight={'bold'}
-                width={wp(35)}
+                width={wp(25)}
                 onPress={() => handleDeleteListing(item.doctor_list_id)}
               />
 
@@ -181,7 +245,10 @@ export default function SavedDraft() {
           </View>
         ))
       ) : (
-        <Text style={styles.noListingText}>No listings available</Text>
+        <View style={styles.noListingContainer}>
+          <Text style={styles.noListingText}>No inactive listings available</Text>
+          <Text style={styles.noListingSubText}>Deactivate an active listing to see it here</Text>
+        </View>
       )}
 
       <Toast />
@@ -282,6 +349,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-Regular',
     textAlign: 'center',
-    marginTop: 20,
+  },
+  noListingSubText: {
+    color: '#787579',
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+    marginTop: 5,
   },
 });

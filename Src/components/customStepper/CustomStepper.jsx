@@ -53,7 +53,7 @@ const Stepper = props => {
             justifyContent: 'center',
             alignItems: 'center',
           }}>
-          {content.map((_, i) => {
+          {content && content.map((_, i) => {
             return (
               <React.Fragment key={i}>
                 {i !== 0 && (
@@ -118,12 +118,12 @@ const Stepper = props => {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
-          {content[active]}
+          {content && content[active]}
         </ScrollView>
 
         {showButton && (
           <View>
-            {content.length - 1 !== active && (
+            {content && content.length - 1 !== active && (
               <View style={{marginTop: 20, alignSelf: 'center'}}>
                 <CustomButton
                   title="Next"
@@ -142,7 +142,7 @@ const Stepper = props => {
                 />
               </View>
             )}
-            {content.length - 1 === active && (
+            {content && content.length - 1 === active && (
               <View style={{marginTop: 20, alignSelf: 'center'}}>
                 <CustomButton
                   title="Save"

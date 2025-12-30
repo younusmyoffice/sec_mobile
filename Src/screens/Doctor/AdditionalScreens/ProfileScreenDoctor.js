@@ -1,4 +1,4 @@
-import {SafeAreaView, ScrollView, StyleSheet, View} from 'react-native';
+import {SafeAreaView, ScrollView, StyleSheet, View, Alert} from 'react-native';
 import React, {useEffect, useRef, useState} from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
@@ -251,7 +251,97 @@ export default function ProfileScreenDoctor() {
   //   return field;
   // });
   const submitForm = async () => {
-    console.log("first Submit",formData);
+    try {
+      // Basic sanitize: trim strings
+      const sanitize = v => (v === undefined || v === null ? null : String(v).trim());
+      const payload = { ...formData };
+      Object.keys(payload).forEach(k => {
+        if (typeof payload[k] === 'string') payload[k] = sanitize(payload[k]);
+      });
+
+      // Helpers
+      const toIntOrNull = v => {
+        if (v === undefined || v === null || v === '') return null;
+        const n = parseInt(v, 10);
+        return Number.isNaN(n) ? null : n;
+      };
+      const toDateOrNull = v => {
+        const s = sanitize(v);
+        if (!s) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+        const d = new Date(s);
+        if (!isNaN(d)) {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
+        }
+        return null;
+      };
+      const yearFrom = v => {
+        const s = sanitize(v);
+        if (!s) return null;
+        const m = s.match(/^(\d{4})-\d{2}-\d{2}$/);
+        if (m) return parseInt(m[1], 10);
+        const dmy = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (dmy) return parseInt(dmy[3], 10);
+        const n = parseInt(s, 10);
+        return Number.isNaN(n) ? null : n;
+      };
+
+      // Build payload matching your API structure exactly
+      const normalized = {
+        suid: toIntOrNull(formData?.suid || userId),
+        email: sanitize(formData?.email),
+        first_name: sanitize(formData?.first_name),
+        last_name: sanitize(formData?.last_name),
+        middle_name: sanitize(formData?.middle_name),
+        gender: sanitize(formData?.gender)?.toLowerCase() || null,
+        DOB: sanitize(formData?.DOB), // Keep as-is since your API expects "01-1995" format
+        country_id: sanitize(formData?.country_id), // Keep as string since your API expects "7"
+        state_id: sanitize(formData?.state_id), // Keep as string since your API expects "17"
+        city_id: sanitize(formData?.city_id), // Keep as string since your API expects "362"
+        street_address1: sanitize(formData?.street_address1),
+        street_address2: sanitize(formData?.street_address2),
+        zip_code: sanitize(formData?.zip_code),
+        hospital_org: sanitize(formData?.hospital_org),
+        council_name: sanitize(formData?.council_name),
+        profile_picture: sanitize(formData?.profile_picture),
+        // Additional fields that might be needed
+        qualification: sanitize(formData?.qualification),
+        university_name: sanitize(formData?.university_name || formData?.university),
+        degree: sanitize(formData?.degree),
+        state_reg_number: sanitize(formData?.state_reg_number || formData?.StateRegNo),
+        country_reg_number: sanitize(formData?.country_reg_number || formData?.IndianRegNo),
+        state_reg_date: toDateOrNull(formData?.state_reg_date || formData?.RegistrationDate),
+        country_reg_date: toDateOrNull(formData?.country_reg_date || formData?.RegistrationDate2),
+        lic_title: sanitize(formData?.lic_title),
+        lic_certificate_no: toIntOrNull(formData?.lic_certificate_no),
+        lic_issuedby: sanitize(formData?.lic_issuedby),
+        lic_date: toDateOrNull(formData?.lic_date),
+        lic_description: sanitize(formData?.lic_description),
+        job: sanitize(formData?.job),
+        fileExtension: sanitize(formData?.fileExtension),
+      };
+      
+      // Remove undefined values
+      Object.keys(normalized).forEach(k => { 
+        if (normalized[k] === undefined) normalized[k] = null; 
+      });
+
+      const res = await axiosInstance.post('Doctor/updatedoctorprofile', normalized);
+      showDetails();
+      // Success feedback
+      if (res?.data) {
+        console.log('✅ Profile updated');
+        Alert.alert('Success', 'Profile updated successfully');
+      }
+    } catch (e) {
+      console.error('❌ Update failed:', e?.response?.data || e?.message);
+      Alert.alert('Update Failed', e?.response?.data?.message || 'Please try again');
+    }
   }
   useEffect(() => {
     showDetails();
@@ -282,6 +372,7 @@ export default function ProfileScreenDoctor() {
         isDisabled={isDisabled}
         setIsDisabled={setIsDisabled}
         handleEnable={handleEnable}
+        submitForm={submitForm}
          />;
       case 'ProfessionalDetails':
         return <ProfessionalDetails 

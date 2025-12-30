@@ -17,6 +17,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useNavigation} from '@react-navigation/native';
 import SkeletonLoader from '../customSkeleton/SkeletonLoader';
+import { getProfileImageSource } from '../../utils/imageUtils';
 const CustomTable = ({
   textCenter,
   header,
@@ -46,8 +47,16 @@ const CustomTable = ({
     // Toggle modal visibility for the given row
     setModalIndex(modalIndex === index ? null : index);
   };
+
   console.log(id);
   console.log("data from custom table",data)
+  
+  // Debug: Log the first row to see the exact structure
+  if (data && data.length > 0) {
+    console.log("🔍 First row data structure:", Object.keys(data[0]));
+    console.log("🔍 First row department_name:", data[0].department_name);
+    console.log("🔍 First row full data:", data[0]);
+  }
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView horizontal={true} style={styles.scrollView} >
@@ -83,15 +92,18 @@ const CustomTable = ({
               </>
             ) : data?.length > 0 ? (
               data?.map((rowdata, i) => (
-                <>
+                <React.Fragment key={i}>
                   <TouchableWithoutFeedback onPress={onpress}>
                     <View style={styles.row}>
                       {isUserDetails && (
                         <View style={[styles.cell, {flex: 2}]}>
                           <View style={styles.cellContent}>
                             <Image
-                              source={rowdata.profile_picture}
+                              source={getProfileImageSource(rowdata.profile_picture)}
                               style={styles.image}
+                              onError={() => {
+                                console.log('🖼️ CustomTable image failed to load');
+                              }}
                             />
                             <View>
                               <Text style={styles.nameText}>
@@ -102,15 +114,126 @@ const CustomTable = ({
                                   rowdata.last_name}
                               </Text>
                               <Text style={styles.detailsText}>
-                                {rowdata.dept} | Booking Id:
+                                {rowdata.department_name || rowdata.dept} | Booking Id:
                                 {rowdata.appointment_id || rowdata.test_id}
                               </Text>
                             </View>
                           </View>
                         </View>
                       )}
-                      {Object.entries(rowdata).map(([key, value], index) =>
-                        key !== 'image' &&
+                      {(() => {
+                        // Create ordered fields array to match header order
+                        const orderedFields = [];
+                        const remainingFields = [];
+                        
+                        // Process fields in order
+                        Object.entries(rowdata).forEach(([key, value]) => {
+                          // Skip excluded fields
+                          if (key === 'image' ||
+                              key === 'first_name' ||
+                              key === 'middle_name' ||
+                              key === 'last_name' ||
+                              key === 'id' ||
+                              key === 'booking_id' ||
+                              key === 'func' ||
+                              key === 'doctor_id' ||
+                              key === 'appointment_id' ||
+                              key === 'action_id' ||
+                              key === 'user_id' ||
+                              key === 'suid' ||
+                              key === 'patient_id' ||
+                              key === 'appointment_id' ||
+                              key === 'role_id' ||
+                              key === 'suid' ||
+                              key === 'clinic_status' ||
+                              key === 'dept_id' ||
+                              key === 'department_id' ||
+                              key === 'report_path' ||
+                              (isUserDetails ? key === 'profile_picture' : false) ||
+                              key === 'hcf_id' ||
+                              key === 'test_id' ||
+                              key === 'updated_at') {
+                            return;
+                          }
+                          
+                          // Add profile_picture at the end
+                          if (key === 'profile_picture') {
+                            remainingFields.push([key, value]);
+                          } else {
+                            orderedFields.push([key, value]);
+                          }
+                        });
+                        
+                        // Combine ordered fields with profile_picture at the end
+                        const finalFields = [...orderedFields, ...remainingFields];
+                        
+                        return finalFields.map(([key, value], index) => {
+                        console.log(`📋 CustomTable field: ${key} = ${value}`);
+                        // Special handling for department_name
+                        if (key === 'department_name') {
+                          console.log(`🏥 Department field found: ${key} = ${value}`);
+                        }
+                        
+                        // Special handling for book_time
+                        if (key === 'book_time') {
+                          console.log(`🕐 Book time field found: ${key} = ${value}`);
+                        }
+                        
+                        // Special handling for profile_picture
+                        if (key === 'profile_picture') {
+                          console.log(`🖼️ Profile picture field found: ${key} = ${value ? 'present' : 'missing'}`);
+                        }
+                        
+                        // Convert time to 12-hour format
+                        let displayValue = value;
+                        if ((key === 'appointment_time' || key === 'book_time') && value) {
+                          try {
+                            // Handle different time formats
+                            if (value.includes('T')) {
+                              // ISO format: "2025-01-18T03:55:44.000Z"
+                              // const date = new Date(value);
+                              // const hours = date.getHours();
+                              // const minutes = date.getMinutes();
+                              // const ampm = hours >= 12 ? 'PM' : 'AM';
+                              // const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+                              // displayValue = `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                              displayValue = `${value}`
+                              console.log(`🕐 ISO Time converted: ${value} → ${displayValue}`);
+                            } else if (value.includes('-')) {
+                              // Format like "17-00"
+                              const timeParts = value.split('-');
+                              if (timeParts.length >= 2) {
+                                const hours = parseInt(timeParts[0]);
+                                const minutes = timeParts[1];
+                                const ampm = hours >= 12 ? 'PM' : 'AM';
+                                const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+                                displayValue = `${displayHours}:${minutes} ${ampm}`;
+                                console.log(`🕐 Dash Time converted: ${value} → ${displayValue}`);
+                              }
+                            } else if (value.includes(':')) {
+                              // Format like "16:11:00" or "00:02:00"
+                              const timeParts = value.split(':');
+                              if (timeParts.length >= 2) {
+                                // const hours = parseInt(timeParts[0]);
+                                // const minutes = timeParts[1];
+                                // const ampm = hours >= 12 ? 'PM' : 'AM';
+                                // const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+                                // displayValue = `${displayHours}:${minutes} ${ampm}`;
+                                 displayValue = `${value}`
+                                console.log(`🕐 Colon Time converted: ${value} → ${displayValue}`);
+                              }
+                            } else if (value.includes('AM') || value.includes('PM')) {
+                              // Already in 12-hour format, keep as is
+                              displayValue = value;
+                              console.log(`🕐 Already 12-hour format: ${value}`);
+                            }
+                          } catch (error) {
+                            console.error('❌ Time conversion error:', error);
+                            displayValue = value; // Fallback to original value
+                          }
+                        }
+                        
+                        return key !== 'image' &&
                         key !== 'first_name' &&
                         key !== 'middle_name' &&
                         key !== 'last_name' &&
@@ -128,8 +251,9 @@ const CustomTable = ({
                         key !== 'suid' &&
                         key !== 'clinic_status' &&
                         key !== 'dept_id' &&
+                        key !== 'department_id' &&
                         key !== 'report_path' &&
-                        key !== 'profile_picture' &&
+                        (isUserDetails ? key !== 'profile_picture' : true) &&
                         key !== 'hcf_id' &&
                         key !== 'test_id' &&
                         key!=='updated_at' ? (
@@ -218,7 +342,7 @@ const CustomTable = ({
                                         color: '#E72B4A',
                                         fontWeight: 'bold',
                                       }}>
-                                      {value}
+                                      {displayValue}
                                     </Text>
                                   ): value === 'Inactive' ? (
                                     <Text
@@ -226,19 +350,33 @@ const CustomTable = ({
                                         color: 'grey',
                                         fontWeight: 'bold',
                                       }}>
-                                      {value}
+                                      {displayValue}
                                     </Text>
                                   ): (
-                                    value
+                                    displayValue
                                   )
+                                ) : key === 'profile_picture' ? (
+                                  <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                    <Image
+                                      source={getProfileImageSource(value)}
+                                      style={{
+                                        width: 30,
+                                        height: 30,
+                                        borderRadius: 15,
+                                        backgroundColor: '#f0f0f0'
+                                      }}
+                                      onError={() => console.log('🖼️ Image failed to load:', value)}
+                                    />
+                                  </View>
                                 ) : (
-                                  <Text>{value}</Text>
+                                  <Text>{displayValue}</Text>
                                 )}
                               </Text>
                             </TouchableWithoutFeedback>
                           </View>
-                        ) : null,
-                      )}
+                        ) : null;
+                        });
+                      })()}
                       {enableMenu && (
                         <View style={[styles.cell, {flex: 1}]}>
                           <TouchableOpacity onPress={() => handleOpen(i)}>
@@ -293,7 +431,7 @@ const CustomTable = ({
                     </View>
                   </TouchableWithoutFeedback>
                   <View style={styles.divider} />
-                </>
+                </React.Fragment>
               ))
             ) : (
               <View style={{marginVertical: 100,alignSelf:'flex-start',}}>

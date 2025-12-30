@@ -1,4 +1,4 @@
-import {StyleSheet, Text, View, ScrollView, SafeAreaView} from 'react-native';
+import {StyleSheet, Text, View, ScrollView, SafeAreaView, Alert} from 'react-native';
 import React, {useState} from 'react';
 import CustomInput from '../../../../components/customInputs/CustomInputs';
 import InAppHeader from '../../../../components/customComponents/InAppHeadre/InAppHeader';
@@ -8,15 +8,17 @@ import {widthPercentageToDP} from 'react-native-responsive-screen';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import {useCommon} from '../../../../Store/CommonContext';
 import axiosInstance from '../../../../utils/axiosInstance';
+import {useNavigation} from '@react-navigation/native';
 
 export default function AddAward() {
+  const navigation = useNavigation();
+  const {userId} = useCommon();
+  
   const staff = [
     {id: 1, name: 'award_title', type: 'text', placeholder: 'Title'},
     {id: 2, name: 'award_issuedby', type: 'text', placeholder: 'Issuing Authority'},
     {id: 3, name: 'award_description', type: 'textarea', placeholder: 'Description'},
   ];
-
-  const {userId} = useCommon();
 
   const [formData, setFormData] = useState({
     award_title: '',
@@ -45,7 +47,13 @@ export default function AddAward() {
   };
 
   const addAward = async () => {
-    console.log('Submitting formData:', formData);
+    console.log('🏆 Submitting award formData:', formData);
+    
+    // Validate required fields
+    if (!formData.award_title || !formData.award_issuedby || !formData.award_date) {
+      Alert.alert('Missing Information', 'Please fill in all required fields (Title, Issuing Authority, and Date)');
+      return;
+    }
   
     try {
       const response = await axiosInstance.post('Doctor/updateDoctorAwards', {
@@ -57,9 +65,24 @@ export default function AddAward() {
         award_description: formData.award_description,
       });
   
-      // Check if the response has a "response" key and display success message
-      if (response.data?.response?.body) {
-        alert(response.data.response.body); // Display the success message
+      console.log('🏆 Award API response:', response.data);
+  
+      // Check for success in multiple possible response formats
+      const isSuccess = response.data?.response?.body || 
+                       response.data?.success === true || 
+                       response.data?.status === 'success' ||
+                       response.status === 200;
+      
+      if (isSuccess) {
+        Alert.alert('Success!', 'Award added successfully', [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate back to ProfileScreenDoctor
+              navigation.goBack();
+            }
+          }
+        ]);
         setFormData({
           award_title: '',
           award_issuedby: '',
@@ -67,20 +90,14 @@ export default function AddAward() {
           award_date: '',
         });
       } else if (response.data?.error) {
-        // Handle known error cases (e.g., USER_NOT_EXISTS)
-        if (response.data.error === 'USER_NOT_EXISTS') {
-          alert('Error: The user does not exist.');
-        } else {
-          alert(`Error: ${response.data.error}`);
-        }
+        Alert.alert('Error', `Failed to add award: ${response.data.error}`);
       } else {
-        // Handle unexpected responses
-        alert('Failed to save the award. Please try again.');
+        Alert.alert('Error', 'Failed to save the award. Please try again.');
       }
     } catch (e) {
-      // Handle network or server errors
-      console.error('Error occurred:', e.message);
-      alert('An error occurred while saving your award. Please check your network and try again.');
+      console.error('🏆 Error occurred:', e.message);
+      console.error('🏆 Error details:', e.response?.data);
+      Alert.alert('Error', 'An error occurred while saving your award. Please check your network and try again.');
     }
   };
   

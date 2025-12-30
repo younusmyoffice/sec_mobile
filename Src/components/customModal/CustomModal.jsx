@@ -46,26 +46,54 @@ const{userId}=useCommon()
     } catch (error) {}
   };
   const handlePayPress = () => {
-    webviewRef.current.injectJavaScript(`
-      if (window.instance) {
-        window.instance.requestPaymentMethod((err, payload) => {
-          if (err) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ error: err.message }));
-          } else {
-           
-            window.ReactNativeWebView.postMessage(JSON.stringify({ nonce: payload.nonce }));
-          }
-        });
-      } else {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ error: "Payment instance not found" }));
-      }
-    `);
+    console.log('💳 handlePayPress called');
+    console.log('💳 webviewRef.current:', webviewRef.current);
+    
+    if (!webviewRef.current) {
+      console.error('❌ WebView ref is null - WebView not loaded yet');
+      Alert.alert('Payment Error', 'Payment system is not ready. Please try again.');
+      return;
+    }
+    
+    try {
+      webviewRef.current.injectJavaScript(`
+        console.log('💳 Injecting payment JavaScript...');
+        if (window.instance) {
+          console.log('💳 Braintree instance found, requesting payment method...');
+          window.instance.requestPaymentMethod((err, payload) => {
+            if (err) {
+              console.error('💳 Payment error:', err);
+              window.ReactNativeWebView.postMessage(JSON.stringify({ error: err.message }));
+            } else {
+              console.log('💳 Payment method received:', payload.nonce);
+              window.ReactNativeWebView.postMessage(JSON.stringify({ nonce: payload.nonce }));
+            }
+          });
+        } else {
+          console.error('💳 Braintree instance not found');
+          window.ReactNativeWebView.postMessage(JSON.stringify({ error: "Payment instance not found" }));
+        }
+      `);
+    } catch (error) {
+      console.error('❌ Error injecting JavaScript:', error);
+      Alert.alert('Payment Error', 'Failed to process payment. Please try again.');
+    }
   };
   useEffect(() => {
       if(userId){
         setBookTest({...bookTest, patient_id: userId.toString()})
       }
     }, [userId]);
+  const handlePaymentComplete = (success) => {
+    console.log('💳 Payment completed with success:', success);
+    if (success) {
+      console.log('✅ Closing modal after successful payment');
+      set(!modalVisible);
+    } else {
+      console.log('❌ Payment failed, keeping modal open');
+    }
+  };
+
   const testStepper = [
     <HcfDateTime
       availableDates={availableDates}
@@ -74,8 +102,12 @@ const{userId}=useCommon()
       setBookTest={setBookTest}
 
     />,
-    <HcfPayment webviewRef={webviewRef} bookTest={bookTest}
-    setBookTest={setBookTest}/>
+    <HcfPayment 
+      webviewRef={webviewRef} 
+      bookTest={bookTest}
+      setBookTest={setBookTest}
+      onPaymentComplete={handlePaymentComplete}
+    />
   ];
   useEffect(() => {
     fetchLabtestDates();
@@ -113,7 +145,12 @@ const{userId}=useCommon()
                 justifyContent: 'space-between',
                 width: '100%',
               }}>
-              <Text style={{color: 'black'}}>Buy test</Text>
+              <View>
+                <Text style={{color: 'black', fontSize: 18, fontWeight: 'bold'}}>Buy Test</Text>
+                <Text style={{color: '#666', fontSize: 14}}>
+                  Step {active + 1} of {testStepper.length}: {active === 0 ? 'Select Date' : 'Payment'}
+                </Text>
+              </View>
               <TouchableWithoutFeedback onPress={() => set(!modalVisible)}>
                 <MaterialCommunityIcons
                   name="close"
@@ -129,10 +166,35 @@ const{userId}=useCommon()
                 content={testStepper}
                 onBack={() => setActive(p => p - 1)}
                 onFinish={() => {
-                  handlePayPress()
+                  console.log('🎯 Finishing lab test booking with data:', bookTest);
+                  
+                  // Validate all required fields before payment
+                  const requiredFields = ['book_date', 'patient_id', 'test_subexam_id'];
+                  const missingFields = requiredFields.filter(field => !bookTest[field] || bookTest[field] === '');
+                  
+                  if (missingFields.length > 0) {
+                    console.log('⚠️ Missing required fields:', missingFields);
+                    console.log('📋 Current bookTest:', bookTest);
+                    return;
+                  }
+                  
+                  console.log('✅ All required fields present, proceeding with payment');
+                  handlePayPress();
                 }}
                 onNext={() => {
-                  console.log('hello');
+                  console.log('🔄 Moving to next step, current active:', active);
+                  console.log('📋 Current bookTest data:', bookTest);
+                  
+                  // Validate current step before proceeding
+                  if (active === 0) {
+                    // Validate date/time selection
+                    if (!bookTest.book_date) {
+                      console.log('⚠️ No date selected, staying on current step');
+                      return;
+                    }
+                    console.log('✅ Date selected, proceeding to payment step');
+                  }
+                  
                   setActive(p => p + 1);
                 }}
                 showButton={true}

@@ -99,9 +99,12 @@ const Request = ({ data, loader, reRenderApi, option }) => {
           })}
         </View>
       ) : (
-        <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-          <Image source={require('../../../assets/NoAppointment.png')} />
-          <Text style={{ fontSize: 18, fontWeight: 'bold' }}>You don’t have any appointment requests</Text>
+        <View style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Image 
+            source={require('../../../assets/images/CardDoctor1.png')} 
+            style={{ width: 150, height: 150, resizeMode: 'contain' }}
+          />
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginTop: 20 }}>You don't have any appointment requests</Text>
           <Text style={{ textAlign: 'center', marginVertical: 10 }}>Add Listings to manage your schedule.</Text>
         </View>
       )}

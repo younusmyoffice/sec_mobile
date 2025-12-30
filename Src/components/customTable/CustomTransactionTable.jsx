@@ -47,30 +47,31 @@ const CustomTransactionTable = ({header, textCenter, data}) => {
                     width: wp(60),
                   }}>
                   <View>
-
-                    {data.status == 'canceled'? <Image
-                      source={require('../../assets/Send.png')}
-                      style={{
-                        height: hp(7),
-                        width: wp(17),
-                        borderRadius: 15,
-                        resizeMode: 'contain',
-                      }}
-                    /> : <Image
-                    source={require('../../assets/Recieve.png')}
-                    style={{
-                      height: hp(7),
-                      width: wp(17),
-                      borderRadius: 15,
-                      resizeMode: 'contain',
-                    }}
-                  />}
-                    
+                    {data.status == 'canceled' ? 
+                      <Image
+                        source={require('../../assets/Send.png')}
+                        style={{
+                          height: hp(7),
+                          width: wp(17),
+                          borderRadius: 15,
+                          resizeMode: 'contain',
+                        }}
+                      /> : 
+                      <Image
+                        source={data.image || require('../../assets/Recieve.png')}
+                        style={{
+                          height: hp(7),
+                          width: wp(17),
+                          borderRadius: 15,
+                          resizeMode: 'contain',
+                        }}
+                      />
+                    }
                   </View>
                   <View style={{marginHorizontal: 7}}>
                     <Text
                       style={{color: 'black', fontFamily: 'Poppins-Medium'}}>
-                      Appointment Payment
+                      {data.name || 'Transaction'}
                     </Text>
                     <Text
                       style={{
@@ -78,7 +79,9 @@ const CustomTransactionTable = ({header, textCenter, data}) => {
                         fontFamily: 'Poppins-Medium',
                         fontSize: hp(1.4),
                       }}>
-                      TRX Id: {data.transaction_id} 
+                      {data.transaction_id ? `TRX Id: ${data.transaction_id}` : 
+                       data.trans_id ? `Transaction Id: ${data.trans_id}` : 
+                       'Transaction'}
                     </Text>
                     <Text
                       style={{
@@ -86,19 +89,24 @@ const CustomTransactionTable = ({header, textCenter, data}) => {
                         fontFamily: 'Poppins-Medium',
                         fontSize: hp(1.4),
                       }}>
-                      Appointment Id:  {data.appointment_id} 
+                      {data.appointment_id ? `Appointment Id: ${data.appointment_id}` : 
+                       data.test_id ? `Test Id: ${data.test_id}` : 
+                       ''}
                     </Text>
                   </View>
                 </View>
 
                 <View style={[styles.columnDate, {left: 30}]}>
                   <Text style={styles.GreyText}>
-                  {data.appointment_date.substring(0, 10)} | {data.appointment_time}
+                    {data.appointment_date ? 
+                      `${data.appointment_date.substring(0, 10)} | ${data.appointment_time || ''}` : 
+                      data.datetime || 'N/A'
+                    }
                   </Text>
                 </View>
 
                 <View style={[styles.columnAmount, {left: 20}]}>
-                  <Text style={styles.amount}>${data.amount}</Text>
+                  <Text style={styles.amount}>${data.amount || data.price || 0}</Text>
                 </View>
               </View>
             ))}

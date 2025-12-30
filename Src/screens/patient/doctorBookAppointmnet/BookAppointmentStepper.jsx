@@ -1,5 +1,5 @@
-import { View, Text, ScrollView, SafeAreaView } from 'react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, SafeAreaView, Alert } from 'react-native';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import Stepper from '../../../components/customStepper/CustomStepper';
 import BookAppointmentCard from '../../../components/customCards/bookAppointment/BookAppointmentCard';
 import PatientDetails from './PatientDetails';
@@ -17,6 +17,7 @@ import {
 import { useRoute } from '@react-navigation/native';
 import axiosInstance from '../../../utils/axiosInstance';
 import axios from 'axios';
+import { baseUrl } from '../../../utils/baseUrl';
 const BookAppointmentStepper = () => {
   const routes = useRoute();
   const { hcf_id, doctorid, mode } = routes.params;
@@ -58,6 +59,22 @@ const BookAppointmentStepper = () => {
   });
   console.log("patientdetails", patientdetails)
   // console.log('docid', patientdetails.doctor_id);
+  
+  // Debug: Monitor patientdetails state changes
+  useEffect(() => {
+    console.log('🔄 PatientDetails state changed:', {
+      step: active,
+      hasName: !!patientdetails.name,
+      hasGender: !!patientdetails.gender,
+      hasAge: !!patientdetails.age,
+      hasDate: !!patientdetails.appointment_date,
+      hasTime: !!patientdetails.appointment_time,
+      hasDuration: !!patientdetails.duration,
+      hasPlanId: !!patientdetails.doctor_fee_plan_id,
+      hasProblem: !!patientdetails.problem,
+      fullData: patientdetails
+    });
+  }, [patientdetails, active]);
   const fetchAvailableDates = async () => {
     try {
       const response = await axiosInstance.post(
@@ -145,32 +162,49 @@ const BookAppointmentStepper = () => {
   const webviewRef = useRef(null);
 
   const handlePayPress = () => {
-    webviewRef.current.injectJavaScript(`
-      if (window.instance) {
-        window.instance.requestPaymentMethod((err, payload) => {
-          if (err) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ error: err.message }));
-          } else {
-           
-            window.ReactNativeWebView.postMessage(JSON.stringify({ nonce: payload.nonce }));
-          }
-        });
-      } else {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ error: "Payment instance not found" }));
-      }
-    `);
+    console.log('💳 handlePayPress called');
+    console.log('💳 webviewRef.current:', webviewRef.current);
+    
+    if (!webviewRef.current) {
+      console.error('❌ WebView ref is null - WebView not loaded yet');
+      Alert.alert('Payment Error', 'Payment system is not ready. Please try again.');
+      return;
+    }
+    
+    try {
+      webviewRef.current.injectJavaScript(`
+        console.log('💳 Injecting payment JavaScript...');
+        if (window.instance) {
+          console.log('💳 Braintree instance found, requesting payment method...');
+          window.instance.requestPaymentMethod((err, payload) => {
+            if (err) {
+              console.error('💳 Payment error:', err);
+              window.ReactNativeWebView.postMessage(JSON.stringify({ error: err.message }));
+            } else {
+              console.log('💳 Payment method received:', payload.nonce);
+              window.ReactNativeWebView.postMessage(JSON.stringify({ nonce: payload.nonce }));
+            }
+          });
+        } else {
+          console.error('💳 Braintree instance not found');
+          window.ReactNativeWebView.postMessage(JSON.stringify({ error: "Payment instance not found" }));
+        }
+      `);
+    } catch (error) {
+      console.error('❌ Error injecting JavaScript:', error);
+      Alert.alert('Payment Error', 'Failed to process payment. Please try again.');
+    }
   };
   const fetchToken = async () => {
     try {
-      const response = await axios.get(
-        `https://api.shareecare.com/sec/payment/generateToken`,
-      );
-      console.log(response.data);
+      console.log('🔑 Fetching payment token from:', `${baseUrl}payment/generateToken`);
+      const response = await axios.get(`${baseUrl}payment/generateToken`);
+      console.log('🔑 Token response:', response.data);
       setToken(response.data);
       setIsTokenFetched(true);
     } catch (error) {
-      console.error('Error fetching token:', error);
-      Alert.alert('Error', 'Failed to fetch token');
+      console.error('❌ Error fetching token:', error);
+      Alert.alert('Error', 'Failed to fetch payment token. Please try again.');
     }
   };
 
@@ -189,19 +223,23 @@ const BookAppointmentStepper = () => {
     fetchToken();
   }, []);
 
-  const patientInformation = [
+  // Memoize the patient information components to prevent re-creation on every render
+  const patientInformation = useMemo(() => [
     <PatientDetails
+      key="patient-details"
       data={patientDetails.slice(0, 5)}
       patientdetails={patientdetails}
       SetPatientDetails={SetPatientDetails}
     />,
     <BookAppointmenrtDateSelector
+      key="date-selector"
       patientdetails={patientdetails}
       SetPatientDetails={SetPatientDetails}
       availableDates={availableDates}
       availableDurations={availableDurations}
     />,
     <Questioner2
+      key="questioner2"
       data={patientDetails.slice(6, 7)}
       patientdetails={patientdetails}
       SetPatientDetails={SetPatientDetails}
@@ -211,13 +249,14 @@ const BookAppointmentStepper = () => {
       recieveListId={recieveListId}
     />,
     <Questioner
+      key="questioner"
       data={patientDetails.slice(5, 10)}
       patientdetails={patientdetails}
       SetPatientDetails={SetPatientDetails}
       questions={questions}
     />,
-
     <AppointmenrPayment
+      key="payment"
       patientdetails={patientdetails}
       SetPatientDetails={SetPatientDetails}
       webviewRef={webviewRef}
@@ -228,7 +267,19 @@ const BookAppointmentStepper = () => {
       docid={doctorid}
       mode={mode}
     />,
-  ];
+  ], [
+    patientdetails,
+    availableDates,
+    availableDurations,
+    selectpackage,
+    availableSlots,
+    questions,
+    planDetails,
+    token,
+    isTokenFetched,
+    doctorid,
+    mode
+  ]);
 
   return (
     <SafeAreaView style={{ backgroundColor: '#fff', flex: 1 }}>
@@ -257,11 +308,89 @@ const BookAppointmentStepper = () => {
               setActive(p => p - 1);
             }}
             onFinish={() => {
+              console.log('🏁 Stepper Finish - Final validation');
+              console.log('🏁 Final patientdetails:', patientdetails);
+              
+              // Final validation before payment
+              const requiredFields = [
+                'name', 'gender', 'age', 'patient_type',
+                'appointment_date', 'appointment_time', 'duration',
+                'doctor_fee_plan_id', 'problem'
+              ];
+              
+              const missingFields = requiredFields.filter(field => !patientdetails[field] || patientdetails[field] === '');
+              
+              if (missingFields.length > 0) {
+                Alert.alert(
+                  'Missing Information', 
+                  `Please complete all required fields: ${missingFields.join(', ')}`
+                );
+                return;
+              }
+              
+              console.log('✅ Final validation passed - proceeding to payment');
               handlePayPress();
             }}
             onNext={() => {
-              console.log('hello');
-              // if(!isLoginValid) return
+              console.log('🔄 Stepper Next - Current step:', active);
+              console.log('🔄 Current patientdetails:', patientdetails);
+              
+              // Validate current step before proceeding
+              if (active === 0) {
+                // Step 1: Patient Details validation
+                const requiredFields = ['name', 'gender', 'age', 'patient_type'];
+                const missingFields = requiredFields.filter(field => !patientdetails[field] || patientdetails[field] === '');
+                
+                if (missingFields.length > 0) {
+                  Alert.alert(
+                    'Missing Information', 
+                    `Please fill in: ${missingFields.join(', ')}`
+                  );
+                  return;
+                }
+                console.log('✅ Step 1 validation passed');
+              } else if (active === 1) {
+                // Step 2: Date and Duration validation
+                const requiredFields = ['appointment_date', 'duration'];
+                const missingFields = requiredFields.filter(field => !patientdetails[field] || patientdetails[field] === '');
+                
+                if (missingFields.length > 0) {
+                  Alert.alert(
+                    'Missing Information', 
+                    `Please select: ${missingFields.join(', ')}`
+                  );
+                  return;
+                }
+                console.log('✅ Step 2 validation passed');
+              } else if (active === 2) {
+                // Step 3: Time slot validation
+                const requiredFields = ['appointment_time', 'doctor_fee_plan_id'];
+                const missingFields = requiredFields.filter(field => !patientdetails[field] || patientdetails[field] === '');
+                
+                if (missingFields.length > 0) {
+                  Alert.alert(
+                    'Missing Information', 
+                    `Please select: ${missingFields.join(', ')}`
+                  );
+                  return;
+                }
+                console.log('✅ Step 3 validation passed');
+              } else if (active === 3) {
+                // Step 4: Questions validation
+                const requiredFields = ['problem'];
+                const missingFields = requiredFields.filter(field => !patientdetails[field] || patientdetails[field] === '');
+                
+                if (missingFields.length > 0) {
+                  Alert.alert(
+                    'Missing Information', 
+                    `Please fill in: ${missingFields.join(', ')}`
+                  );
+                  return;
+                }
+                console.log('✅ Step 4 validation passed');
+              }
+              
+              // If validation passes, proceed to next step
               setActive(p => p + 1);
             }}
             showButton={true}

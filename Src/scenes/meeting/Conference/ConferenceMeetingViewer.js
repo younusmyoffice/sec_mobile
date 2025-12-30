@@ -9,10 +9,11 @@ import {
 } from "react-native";
 import {
   useMeeting,
-  getAudioDeviceList,
   switchAudioDevice,
   Constants,
 } from "@videosdk.live/react-native-sdk";
+// BUG FIX: Import wrapped version to prevent iOS crashes
+import { getAudioDeviceList } from '../../../utils/videosdkWrapper';
 import {
   CallEnd,
   CameraSwitch,
@@ -132,8 +133,52 @@ export default function ConferenceMeetingViewer() {
   const [audioDevice, setAudioDevice] = useState([]);
 
   async function updateAudioDeviceList() {
-    const devices = await getAudioDeviceList();
-    setAudioDevice(devices);
+    // CRITICAL BUG FIX: Disable device enumeration on iOS due to native crash
+    if (Platform.OS === 'ios') {
+      console.warn('⚠️ [MOBILE] Device enumeration disabled on iOS to prevent native crash');
+      setAudioDevice([]);
+      return;
+    }
+
+    try {
+      console.log('🔍 [MOBILE] Fetching audio devices in conference meeting...');
+      const devices = await getAudioDeviceList();
+      
+      // BUG FIX: Filter out devices with nil/invalid properties to prevent crash
+      const validDevices = (devices || []).filter((device) => {
+        const isValid = device && 
+                        device.deviceId != null && 
+                        device.deviceId !== 'null' &&
+                        device.deviceId !== 'undefined' &&
+                        device.label != null &&
+                        device.label !== 'null' &&
+                        device.label !== 'undefined';
+        
+        if (!isValid) {
+          console.warn('⚠️ [MOBILE] Filtered out invalid device:', device);
+        }
+        
+        return isValid;
+      }).map((device) => {
+        return {
+          deviceId: String(device.deviceId || '').trim(),
+          label: String(device.label || 'Unknown Device').trim(),
+          ...(device.kind && { kind: String(device.kind).trim() }),
+        };
+      });
+      
+      console.log('✅ [MOBILE] Audio devices fetched in conference:', {
+        total: devices?.length || 0,
+        valid: validDevices.length
+      });
+      
+      setAudioDevice(validDevices);
+    } catch (error) {
+      console.error('❌ [MOBILE] ERROR fetching audio devices in conference:', error);
+      console.error('❌ [MOBILE] Error Message:', error?.message);
+      // Set empty array instead of crashing
+      setAudioDevice([]);
+    }
   }
 
   useEffect(() => {
@@ -313,43 +358,46 @@ export default function ConferenceMeetingViewer() {
           }}
         />
       </Menu>
-      <Menu
-        ref={audioDeviceMenuRef}
-        menuBackgroundColor={colors.primary[700]}
-        placement="left"
-        left={70}
-      >
-        {audioDevice.map((device, index) => {
-          return (
-            <>
-              <MenuItem
-                title={
-                  device == "SPEAKER_PHONE"
-                    ? "Speaker"
-                    : device == "EARPIECE"
-                    ? "Earpiece"
-                    : device == "BLUETOOTH"
-                    ? "Bluetooth"
-                    : "Wired Headset"
-                }
-                onPress={() => {
-                  switchAudioDevice(device);
-                  audioDeviceMenuRef.current.close();
-                }}
-              />
-
-              {index != audioDevice.length - 1 && (
-                <View
-                  style={{
-                    height: 1,
-                    backgroundColor: colors.primary["600"],
+      {/* BUG FIX: Only render audio device menu on non-iOS to prevent native crash */}
+      {Platform.OS !== 'ios' && (
+        <Menu
+          ref={audioDeviceMenuRef}
+          menuBackgroundColor={colors.primary[700]}
+          placement="left"
+          left={70}
+        >
+          {audioDevice.map((device, index) => {
+            return (
+              <>
+                <MenuItem
+                  title={
+                    device == "SPEAKER_PHONE"
+                      ? "Speaker"
+                      : device == "EARPIECE"
+                      ? "Earpiece"
+                      : device == "BLUETOOTH"
+                      ? "Bluetooth"
+                      : "Wired Headset"
+                  }
+                  onPress={() => {
+                    switchAudioDevice(device);
+                    audioDeviceMenuRef.current.close();
                   }}
                 />
-              )}
-            </>
-          );
-        })}
-      </Menu>
+
+                {index != audioDevice.length - 1 && (
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: colors.primary["600"],
+                    }}
+                  />
+                )}
+              </>
+            );
+          })}
+        </Menu>
+      )}
       <Menu
         ref={moreOptionsMenu}
         menuBackgroundColor={colors.primary[700]}
@@ -422,10 +470,13 @@ export default function ConferenceMeetingViewer() {
             paddingLeft: 0,
             height: 52,
           }}
-          isDropDown={true}
+          isDropDown={Platform.OS !== 'ios'} // BUG FIX: Disable dropdown on iOS to prevent native crash
           onDropDownPress={async () => {
-            await updateAudioDeviceList();
-            audioDeviceMenuRef.current.show();
+            // BUG FIX: Only enumerate devices on non-iOS platforms
+            if (Platform.OS !== 'ios') {
+              await updateAudioDeviceList();
+              audioDeviceMenuRef.current.show();
+            }
           }}
           backgroundColor={!localMicOn ? colors.primary[100] : "transparent"}
           onPress={() => {

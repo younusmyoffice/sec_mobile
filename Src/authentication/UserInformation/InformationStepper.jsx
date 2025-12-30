@@ -11,21 +11,30 @@ import {
 } from '../../utils/Helper';
 import {handleLocation} from '../../utils/data';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import axios from 'axios';
+import axiosInstance from '../../utils/axiosInstance';
 import QualificationInformation from './QualificationInformation';
 import ProsessionalInformation from './ProsessionalInformation';
 import {baseUrl} from '../../utils/baseUrl';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const InformationStepper = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  
+  console.log('🔍 Full route.params:', route.params);
   const {email, role_id} = route.params;
-  console.log(email);
+  
+  // Ensure role_id is a number
+  const normalizedRoleId = Number(role_id);
+  
+  console.log('📧 Email:', email);
+  console.log('🔢 Raw role_id:', role_id, 'type:', typeof role_id);
+  console.log('🔢 Normalized role_id:', normalizedRoleId, 'type:', typeof normalizedRoleId);
   const [active, setActive] = useState(0);
 
   const baseFields = {
     email: email,
-    role_id: role_id,
+    role_id: normalizedRoleId,
     first_name: '',
     middle_name: '',
     last_name: '',
@@ -41,11 +50,11 @@ const InformationStepper = () => {
   };
 
   const modifiedFields =
-    role_id === 5
+    normalizedRoleId === 5
       ? {
           ...baseFields,
         }
-      : role_id === 3
+      : normalizedRoleId === 3
       ? {
           ...baseFields,
           qualification: '',
@@ -60,8 +69,8 @@ const InformationStepper = () => {
         }
       : {};
 
-  console.log('roleid', role_id);
-  console.log('fields', modifiedFields);
+  console.log('🔍 InformationStepper - normalizedRoleId:', normalizedRoleId, 'type:', typeof normalizedRoleId);
+  console.log('🔍 InformationStepper - fields:', modifiedFields);
 
   const [formData, setFormData] = useState(modifiedFields);
 
@@ -145,19 +154,142 @@ const InformationStepper = () => {
 
   const handleCompleteProfile = async () => {
     console.log(formData);
+    
+    // FIX: Added ClinicNavigation for role_id 6
     const dashboardNavigate =
-      role_id === 5
+      normalizedRoleId === 5
         ? 'PatientNavigation'
-        : role_id === 3
+        : normalizedRoleId === 3
         ? 'DoctorNavigation'
+        : normalizedRoleId === 4
+        ? 'DiagnosticNavigation'
+        : normalizedRoleId === 6
+        ? 'ClinicNavigation'
         : null;
 
     try {
-      const response = await axios.post(
-        `${baseUrl}auth/updateProfile`,
-        formData,
+      // Helpers to coerce and sanitize payload
+      const toIntOrNull = v => {
+        if (v === undefined || v === null || v === '') return null;
+        const n = parseInt(v, 10);
+        return Number.isNaN(n) ? null : n;
+      };
+      const toTrimOrNull = v => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        return s === '' ? null : s;
+      };
+      const toDateOrNull = v => {
+        const s = toTrimOrNull(v);
+        if (!s) return null;
+        // Accept YYYY-MM-DD or DD-MM-YYYY, normalize to YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+        // Fallback: try Date parse
+        const d = new Date(s);
+        if (!isNaN(d)) {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
+        }
+        return null;
+      };
+      const normalizeQualifiedYear = v => {
+        if (v === undefined || v === null || v === '') return null;
+        const s = String(v);
+        const yearFromDate = s.match(/^(\d{4})-\d{2}-\d{2}$/);
+        if (yearFromDate) return parseInt(yearFromDate[1], 10);
+        const dmy = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (dmy) return parseInt(dmy[3], 10);
+        const n = parseInt(s, 10);
+        return Number.isNaN(n) ? null : n;
+      };
+
+      // Build role-specific payload
+      const payload = normalizedRoleId === 3 ? {
+        role_id: normalizedRoleId,
+        email: toTrimOrNull(formData.email),
+        first_name: toTrimOrNull(formData.first_name),
+        last_name: toTrimOrNull(formData.last_name),
+        middle_name: toTrimOrNull(formData.middle_name),
+        gender: toTrimOrNull(formData.gender)?.toLowerCase() || null,
+        DOB: toDateOrNull(formData.DOB),
+        qualification: toTrimOrNull(formData.qualification),
+        university_name: toTrimOrNull(formData.university_name),
+        qualified_year: normalizeQualifiedYear(formData.qualified_year),
+        speciality_id: toIntOrNull(formData.speciality_id),
+        degree: toTrimOrNull(formData.degree),
+        state_reg_number: toTrimOrNull(formData.state_reg_number),
+        country_reg_number: toTrimOrNull(formData.country_reg_number),
+        state_reg_date: toDateOrNull(formData.state_reg_date),
+        country_reg_date: toDateOrNull(formData.country_reg_date),
+        council_name: toTrimOrNull(formData.council_name),
+        street_address1: toTrimOrNull(formData.street_address1),
+        street_address2: toTrimOrNull(formData.street_address2),
+        country_id: toIntOrNull(formData.country_id),
+        state_id: toIntOrNull(formData.state_id),
+        city_id: toIntOrNull(formData.city_id),
+        zip_code: toTrimOrNull(formData.zip_code),
+        lic_title: toTrimOrNull(formData.lic_title),
+        lic_certificate_no: toIntOrNull(formData.lic_certificate_no),
+        lic_issuedby: toTrimOrNull(formData.lic_issuedby),
+        lic_date: toDateOrNull(formData.lic_date),
+        lic_description: toTrimOrNull(formData.lic_description),
+      } : {
+        role_id: normalizedRoleId,
+        email: toTrimOrNull(formData.email),
+        first_name: toTrimOrNull(formData.first_name),
+        last_name: toTrimOrNull(formData.last_name),
+        middle_name: toTrimOrNull(formData.middle_name),
+        gender: toTrimOrNull(formData.gender)?.toLowerCase() || null,
+        DOB: toDateOrNull(formData.DOB),
+        street_address1: toTrimOrNull(formData.street_address1),
+        street_address2: toTrimOrNull(formData.street_address2),
+        country_id: toIntOrNull(formData.country_id),
+        state_id: toIntOrNull(formData.state_id),
+        city_id: toIntOrNull(formData.city_id),
+        zip_code: toTrimOrNull(formData.zip_code),
+      };
+
+      // Remove undefined keys (convert to null or omit)
+      Object.keys(payload).forEach(k => {
+        if (payload[k] === undefined) payload[k] = null;
+      });
+
+      const response = await axiosInstance.post(
+        `auth/updateProfile`,
+        payload,
       );
-      navigation.navigate(dashboardNavigate);
+      
+      console.log('✅ Profile update successful:', response.data);
+      console.log('🚀 Navigating to:', dashboardNavigate);
+      console.log('🔢 Role ID from form:', normalizedRoleId);
+      console.log('🔢 Role ID from response:', response.data?.response?.role_id);
+      console.log('🔢 Sec Role ID from response:', response.data?.response?.sec_role_id);
+      
+      // FIX: Update stored role_id after profile completion (use sec_role_id if role_id is null)
+      const responseRoleId = response.data?.response?.role_id || response.data?.response?.sec_role_id;
+      if (responseRoleId) {
+        try {
+          await AsyncStorage.setItem('role_id', JSON.stringify(responseRoleId));
+          console.log('✅ Updated stored role_id to:', responseRoleId);
+        } catch (error) {
+          console.error('❌ Error updating role_id:', error);
+        }
+      }
+      
+      if (dashboardNavigate) {
+        console.log('✅ Navigating to dashboard:', dashboardNavigate);
+        navigation.replace(dashboardNavigate); // FIX: Use replace instead of navigate to prevent back navigation
+      } else {
+        console.log('❌ No dashboard navigation defined for role_id:', normalizedRoleId);
+        console.log('⚠️ This should not happen - all supported roles should have navigation');
+        // Fallback navigation - navigate to login as a safety measure
+        navigation.navigate('Login', { role_id: normalizedRoleId });
+      }
+      
       console.log(response.data.response);
     } catch (error) {
       console.log(error);
@@ -231,9 +363,66 @@ const InformationStepper = () => {
     />,
   ];
 
+  // Diagnostic content - similar to patient but with contact info
+  const Diagnosticcontent = [
+    <PersonalInformation
+      data={personal}
+      formData={formData}
+      onChange={handleChange}
+      calculateMarkedDates={calculateMarkedDates}
+      endDate={endDate}
+      startDate={startDate}
+      setEndDate={setEndDate}
+      setStartDate={setStartDate}
+      handleDayPress={handleDayPress}
+      resetDates={resetDates}
+      markedDates={markedDates}
+    />,
+    <ContactInformation
+      data={contact}
+      formData={formData}
+      onChange={handleChange}
+    />,
+  ];
+
+  // FIX: Added Clinic content (same as Patient/Diagnostic - Personal + Contact)
+  const Cliniccontent = [
+    <PersonalInformation
+      data={personal}
+      formData={formData}
+      onChange={handleChange}
+      calculateMarkedDates={calculateMarkedDates}
+      endDate={endDate}
+      startDate={startDate}
+      setEndDate={setEndDate}
+      setStartDate={setStartDate}
+      handleDayPress={handleDayPress}
+      resetDates={resetDates}
+      markedDates={markedDates}
+    />,
+    <ContactInformation
+      data={contact}
+      formData={formData}
+      onChange={handleChange}
+    />,
+  ];
+
   const baseContent =
-    role_id === 5 ? Patientcontent : role_id === 3 ? Doctorcontent : null;
-  console.log(formData);
+    normalizedRoleId === 5 ? Patientcontent : 
+    normalizedRoleId === 3 ? Doctorcontent : 
+    normalizedRoleId === 4 ? Diagnosticcontent :
+    normalizedRoleId === 6 ? Cliniccontent : [];
+  
+  // If no valid content, show error message
+  if (!baseContent || baseContent.length === 0) {
+    return (
+      <SafeAreaView style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+        <Text style={{fontSize: 18, color: 'red', textAlign: 'center'}}>
+          Invalid role_id: {normalizedRoleId} (raw: {role_id}). Please contact support.
+        </Text>
+      </SafeAreaView>
+    );
+  }
   return (
     <ScrollView>
       <SafeAreaView style={{backgroundColor: '#fff'}}>

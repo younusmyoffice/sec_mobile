@@ -15,6 +15,7 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
+import { getProfileImageSource, handleImageError, handleImageLoad } from '../../../utils/imageUtils';
 import SkeletonLoader from '../../customSkeleton/SkeletonLoader';
 const AppointmentCard = ({
   loading,
@@ -174,13 +175,16 @@ const AppointmentCard = ({
           <View style={styles.cardbody}>
             <View>
               <Image
-                source={{uri: profile_picture && profile_picture}}
+                source={getProfileImageSource(profile_picture)}
+                onLoad={handleImageLoad}
+                onError={(error) => handleImageError(error)}
                 style={{
                   borderRadius: 20,
                   elevation: 10,
                   height: hp(10),
                   width: wp(20),
                 }}
+                defaultSource={require('../../../assets/images/CardDoctor1.png')}
               />
             </View>
 

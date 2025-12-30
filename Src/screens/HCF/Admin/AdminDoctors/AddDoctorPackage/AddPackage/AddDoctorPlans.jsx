@@ -1,6 +1,6 @@
 import {View, Text, ScrollView, SafeAreaView, Button} from 'react-native';
 import CheckBox from '@react-native-community/checkbox';
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import AdminHeader from '../../../../../../components/customComponents/AdminHeader/AdminHeader';
 import InAppCrossBackHeader from '../../../../../../components/customComponents/InAppCrossBackHeader/InAppCrossBackHeader';
 import InAppHeader from '../../../../../../components/customComponents/InAppHeadre/InAppHeader';
@@ -17,11 +17,15 @@ import axiosInstance from '../../../../../../utils/axiosInstance';
 import { useCommon } from '../../../../../../Store/CommonContext';
 import CustomToaster from '../../../../../../components/customToaster/CustomToaster';
 import { useNavigation } from '@react-navigation/native';
+import { baseUrl } from '../../../../../../utils/baseUrl';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const AddDoctorPlans = () => {
   const navigation=useNavigation()
   const {userId} = useAuth();
   const{doctor_id}=useCommon()
-  console.log("hcf did",doctor_id)
+  console.log("🔍 AddDoctorPlans Debug:");
+  console.log("👤 User ID:", userId, 'Type:', typeof userId);
+  console.log("👨‍⚕️ Doctor ID:", doctor_id, 'Type:', typeof doctor_id);
   const [doctorPlanDetails, setDoctorPlanDetails] = useState({
     price: '',
     duration: '',
@@ -31,16 +35,27 @@ const AddDoctorPlans = () => {
   const [markedDates, setMarkedDates] = useState({});
   const [startTime, setStartTime] = useState(null);
   const [formData, setFormData] = useState({
-    hcf_id: userId.toString(),
-    doctor_id: doctor_id.toString(),
+    hcf_id: userId ? userId.toString() : '',
+    doctor_id: doctor_id ? doctor_id.toString() : '',
     listing_name: '',
     working_days_start: '',
     working_days_end: '',
     working_time_start: '',
+    working_time_end: '',
   });
   // const {userId} = useCommon();
 
   const [endTime, setEndTime] = useState(null);
+  
+  // Update formData when doctor_id becomes available
+  useEffect(() => {
+    if (doctor_id) {
+      setFormData(prev => ({
+        ...prev,
+        doctor_id: doctor_id.toString(),
+      }));
+    }
+  }, [doctor_id]);
   const [doctorPlanFields, setDoctorPlanFields] = useState([
     {
       id: 1,
@@ -220,7 +235,7 @@ const AddDoctorPlans = () => {
     const selectedPlans = doctorPlanFields
       .filter(field => field.selected)
       .map(field => ({
-        plan_fee: field.Inputs.find(input => input.name === 'price').value,
+        plan_fee: parseInt(field.Inputs.find(input => input.name === 'price').value) || 0,
         plan_name: field.Clabel.toLowerCase(),
         plan_duration: field.Inputs.find(input => input.name === 'duration')
           .value,
@@ -231,10 +246,27 @@ const AddDoctorPlans = () => {
         plan_description: field.plan_description,
       }));
     console.log('firstPlan uhhhuuu', 1);
-    return {
+    
+    // Ensure working_time_end has a default value if empty
+    const payload = {
       ...formData,
       plan: selectedPlans,
     };
+    
+    // If working_time_end is empty, set it to 1 hour after working_time_start
+    if (!payload.working_time_end || payload.working_time_end.trim() === '') {
+      if (payload.working_time_start) {
+        const startTime = payload.working_time_start;
+        const [hours, minutes, seconds] = startTime.split(':').map(Number);
+        const endTime = new Date();
+        endTime.setHours(hours + 1, minutes, seconds);
+        payload.working_time_end = endTime.toTimeString().split(' ')[0];
+      } else {
+        payload.working_time_end = '18:00:00'; // Default end time
+      }
+    }
+    
+    return payload;
   };
 
   const payload = preparePayload();
@@ -285,16 +317,69 @@ const AddDoctorPlans = () => {
   };
 
   const handleAddPlan = async () => {
-    console.log("payload in function",payload)
+    console.log("📦 Adding doctor plan with payload:", payload);
+    
+    // Validate required fields
+    if (!payload.listing_name || !payload.working_days_start || !payload.working_days_end || !payload.working_time_start) {
+      CustomToaster.show('error', 'Missing Fields', 'Please fill in all required fields');
+      return;
+    }
+    
+    if (!payload.doctor_id || payload.doctor_id === '') {
+      CustomToaster.show('error', 'Doctor ID Missing', 'Doctor ID is required. Please create a doctor first.');
+      return;
+    }
+    
+    if (!payload.plan || payload.plan.length === 0) {
+      CustomToaster.show('error', 'No Plans', 'Please select at least one plan');
+      return;
+    }
+    
     try {
+      // Debug token
+      const token = await AsyncStorage.getItem('access_token');
+      console.log('🔑 Stored token:', token);
+      console.log('🚀 Making API request to:', `hcf/addDoctorWorkingDetailsAndPlan`);
+      console.log('📦 Request payload:', JSON.stringify(payload, null, 2));
+      
       const response = await axiosInstance.post(
-        `https://api.shareecare.com/sec/hcf/addDoctorWorkingDetailsAndPlan`,
+        `hcf/addDoctorWorkingDetailsAndPlan`,
         payload,
       );
-      console.log(response.data);
-      CustomToaster.show('success',"Plan Created Successfully")
+      
+      console.log('✅ Plan creation response:', response.data);
+      console.log('📊 Response status:', response.status);
+      console.log('📋 Response headers:', response.headers);
+      
+      CustomToaster.show('success', 'Success', 'Doctor plan created successfully');
+      
+      // Navigate back to doctor package screen
+      navigation.goBack();
+      
     } catch (error) {
-      console.log(error);
+      console.error('❌ Plan creation failed:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+        }
+      });
+      
+      let errorMessage = 'Failed to create plan. Please try again.';
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      CustomToaster.show('error', 'Error', errorMessage);
     }
   };
   console.log(formData);
@@ -367,6 +452,19 @@ const AddDoctorPlans = () => {
                     working_time_start: time,
                   }));
                 }}
+              />
+              
+              <TimeRangePicker
+                Type={'singleline'}
+                startTime={endTime}
+                onStartTimeChange={time => {
+                  setEndTime(time);
+                  setFormData(prev => ({
+                    ...prev,
+                    working_time_end: time,
+                  }));
+                }}
+                placeholder="End Time"
               />
             </View>
           </View>

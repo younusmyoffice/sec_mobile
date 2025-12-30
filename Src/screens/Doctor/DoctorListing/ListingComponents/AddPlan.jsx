@@ -90,8 +90,15 @@ const AddPlan = ({ setActiveTab, listingId }) => {
   }, [userId, listingId]);
 
   const fetchPlans = async () => {
-    if (!userId || !listingId) {
-      Alert.alert('Error', 'Missing required fields: userId or listingId');
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      console.log('⚠️ User not authenticated, skipping plans fetch');
+      setError('Please login to view plans');
+      return;
+    }
+
+    if (!listingId) {
+      console.log('⚠️ No listingId provided, skipping plans fetch');
+      setError('No listing selected');
       return;
     }
 

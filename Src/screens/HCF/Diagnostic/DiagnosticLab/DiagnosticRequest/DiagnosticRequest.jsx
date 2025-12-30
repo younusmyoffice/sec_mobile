@@ -1,79 +1,108 @@
-import {View, Text} from 'react-native';
+/**
+ * ============================================================================
+ * DIAGNOSTIC REQUEST COMPONENT
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Container component for Diagnostic Request section with tabs for
+ * Received and Rejected test requests.
+ * 
+ * FEATURES:
+ * - Tab-based navigation (Received, Rejected)
+ * - Sub-components for received and rejected requests
+ * 
+ * REUSABLE COMPONENTS:
+ * - TopTabs: Tab navigation
+ * - Recieved: Received requests component
+ * - Rejected: Rejected requests component
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * @module DiagnosticRequest
+ */
+
+import {View, StyleSheet} from 'react-native';
 import React, {useState} from 'react';
 import TopTabs from '../../../../../components/customComponents/TopTabs/TopTabs';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import CustomInput from '../../../../../components/customInputs/CustomInputs';
 import Recieved from './Recieved';
 import Rejected from './Rejected';
+import Logger from '../../../../../constants/logger';
+import { COLORS } from '../../../../../constants/colors';
+
 const DiagnosticRequest = () => {
-  const [activeTab, setactiveTab] = useState('Recevied');
+  const [activeTab, setActiveTab] = useState('Recevied'); // NOTE: Typo in original - "Recevied" should be "Received"
+
+  /**
+   * Render component based on active tab
+   * @returns {JSX.Element} Component to render
+   */
   const renderComponent = () => {
     switch (activeTab) {
-      case 'Recevied':
-        return <Recieved/>
+      case 'Recevied': // NOTE: Keeping original typo for consistency
+        Logger.debug('Rendering Recieved component');
+        return <Recieved />;
       case 'Rejected':
-        return <Rejected/>
+        Logger.debug('Rendering Rejected component');
+        return <Rejected />;
+      default:
+        Logger.warn('Invalid activeTab', { activeTab });
+        return null;
     }
   };
+
   return (
-    <View style={{gap: 10}}>
-      <View style={{alignSelf: 'center'}}>
-        <View
-          style={{
-            backgroundColor: '#f0f0f0',
-            borderRadius: 20,
-            gap: 5,
-            height: hp(8),
-          }}>
-          <View style={{alignItems: 'center'}}>
-            <TopTabs
-              data={[
-                {id: 1, title: 'Recevied'},
-                {id: 2, title: 'Rejected'},
-              ]}
-              activeTab={activeTab}
-              setActiveTab={setactiveTab}
-              activeButtonColor="black"
-              nonactivecolor="white"
-              borderRadius={20}
-            />
-          </View>
+    <View style={styles.container}>
+      <View style={styles.tabsWrapper}>
+        <View style={styles.tabsContainer}>
+          <TopTabs
+            data={[
+              {id: 1, title: 'Recevied'}, // NOTE: Typo kept for consistency
+              {id: 2, title: 'Rejected'},
+            ]}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            activeButtonColor="black"
+            nonactivecolor={COLORS.TEXT_WHITE}
+            borderRadius={20}
+          />
         </View>
       </View>
-      <View style={{alignSelf: 'center'}}>
-        {/* <View style={{flexDirection: 'row'}}>
-          <CustomInput
-            type={'select'}
-            selectborderBottomWidth={0.5}
-            selectborderBottomColor="#E6E1E5"
-            selectborderRadius={10}
-            selectbackgroundColor="#f0f0f0"
-            selectwidth={wp(30)}
-            selectborderWidth={0.5}
-            selectborderColor={'#E6E1E5'}
-            placeholder={'Date'}
-            selectplaceholdercolor={'#787579'}
-          />
-          <CustomInput
-            type={'select'}
-            selectborderBottomWidth={0.5}
-            selectborderBottomColor="#E6E1E5"
-            selectborderRadius={10}
-            selectbackgroundColor="#f0f0f0"
-            selectwidth={wp(30)}
-            selectborderWidth={0.5}
-            selectborderColor={'#E6E1E5'}
-            placeholder={'Filter'}
-            selectplaceholdercolor={'#787579'}
-          />
-        </View> */}
+      
+      <View style={styles.componentContainer}>
+        {renderComponent()}
       </View>
-      <View>{renderComponent()}</View>
     </View>
   );
 };
+
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
+const styles = StyleSheet.create({
+  container: {
+    gap: 10,
+  },
+  tabsWrapper: {
+    alignSelf: 'center',
+  },
+  tabsContainer: {
+    backgroundColor: COLORS.GRAY_LIGHT,
+    borderRadius: 20,
+    gap: 5,
+    height: hp(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  componentContainer: {
+    // Component container styling
+  },
+});
 
 export default DiagnosticRequest;

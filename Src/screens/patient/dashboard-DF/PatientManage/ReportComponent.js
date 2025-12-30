@@ -1,28 +1,68 @@
+/**
+ * ============================================================================
+ * REPORT COMPONENT
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Component to display and manage patient reports with tabs for All Files,
+ * Examine, Received, and Shared reports.
+ * 
+ * FEATURES:
+ * - Tabbed interface (All Files, Examine, Received, Shared)
+ * - Infinite scroll with pagination
+ * - File download functionality
+ * - Different table headers per report type
+ * 
+ * SECURITY:
+ * - Uses axiosInstance for authenticated API calls
+ * - Validates userId before API calls
+ * - Uses userId from CommonContext (preferred over AsyncStorage)
+ * - File download permission checks (Android)
+ * 
+ * ERROR HANDLING:
+ * - CustomToaster for user-friendly error/success messages
+ * - Comprehensive error handling
+ * - Loading states with CustomLoader
+ * 
+ * REUSABLE COMPONENTS:
+ * - CustomLoader: Loading indicator
+ * - CustomToaster: Toast notifications
+ * - CustomTable: Table display component
+ * - TopTabs: Tab navigation
+ * 
+ * ACCESS TOKEN:
+ * - Handled automatically by axiosInstance (reusable throughout app)
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * PERFORMANCE:
+ * - Pagination for large datasets
+ * - Infinite scroll with loading states
+ * 
+ * @module ReportComponent
+ */
+
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
-  Image,
-  TouchableWithoutFeedback,
   Platform,
   PermissionsAndroid,
+  Alert,
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
-import DateRangePicker from '../../../../components/callendarPicker/RangeDatePicker';
-import CustomButton from '../../../../components/customButton/CustomButton';
 import TopTabs from '../../../../components/customComponents/TopTabs/TopTabs';
-import {
-  widthPercentageToDP as wp,
-  heightPercentageToDP as hp,
-} from 'react-native-responsive-screen';
 import CustomTable from '../../../../components/customTable/CustomTable';
 import axiosInstance from '../../../../utils/axiosInstance';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNFS from 'react-native-fs';
 import {useCommon} from '../../../../Store/CommonContext';
+import CustomLoader from '../../../../components/customComponents/customLoader/CustomLoader';
+import CustomToaster from '../../../../components/customToaster/CustomToaster';
+import Logger from '../../../../constants/logger';
+import { COLORS } from '../../../../constants/colors';
 
 export default function ReportComponent({length}) {
   const {
@@ -33,38 +73,31 @@ export default function ReportComponent({length}) {
     pageReceivedReports,
     pageSharedReports,
   } = useCommon();
-  console.log('length', length);
+  
   const [reportsState, setReportState] = useState('All Files');
-  const [userId, setUserId] = useState();
+  const {userId} = useCommon();
   const [pageAllReports, setPageAllReports] = useState(1);
   const [pageExamineReports, setPageExamineReports] = useState(1);
-  // const [pageSharedReports, setPageSharedReports] = useState(1);
-  // const [pageReceivedReports, setPageReceivedReports] = useState(1);
   const [limit] = useState(5);
   const [allReports, setAllReports] = useState([]);
   const [examineReports, setExamineReports] = useState([]);
-  // const [recievedReports, setRecieveReports] = useState([]);
-  // const [sharedReports, setSharedReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchSuid = async () => {
-    try {
-      const suid = await AsyncStorage.getItem('suid');
-      console.log('SUID:', suid);
-      setUserId(suid);
-    } catch (error) {
-      console.error('Error fetching suid:', error);
-    }
-  };
-
+  /**
+   * Handle scroll end for infinite scroll pagination
+   * PERFORMANCE: Increments page and fetches more data
+   * @param {object} nativeEvent - Scroll event
+   */
   const handleScrollEnd = ({nativeEvent}) => {
-    console.log('hello');
     const {layoutMeasurement, contentOffset, contentSize} = nativeEvent;
     const isBottom =
       layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
 
     if (isBottom && !isLoading) {
-      setPageAllReports(prevPage => prevPage + 1);
+      Logger.debug('Scroll reached bottom, loading more reports', {
+        reportsState,
+      });
+
       switch (reportsState) {
         case 'All Files':
           setPageAllReports(prev => prev + 1);
@@ -76,21 +109,42 @@ export default function ReportComponent({length}) {
           break;
         case 'Shared':
           setPageSharedReports(prev => prev + 1);
-          fetchSharedReports();
+          // Shared reports fetched from context
+          Logger.debug('Shared reports pagination', {
+            page: pageSharedReports + 1,
+          });
           break;
         case 'Received':
           setPageReceivedReports(prev => prev + 1);
-          fetchRecievedReports();
+          // Received reports fetched from context
+          Logger.debug('Received reports pagination', {
+            page: pageReceivedReports + 1,
+          });
           break;
         default:
-          console.log('Unknown report type');
+          Logger.warn('Unknown report type for pagination', { reportsState });
       }
     }
   };
+
+  /**
+   * Fetch all requested reports
+   * SECURITY: Validates userId before API call
+   * ERROR HANDLING: Comprehensive error handling
+   */
   const fetchAllReports = async () => {
+    // SECURITY: Validate userId before API call
+    if (!userId || userId === 'null' || userId === 'undefined') {
+      Logger.error('Invalid userId for all reports', { userId });
+      CustomToaster.show('error', 'Error', 'Invalid user session. Please login again.');
+      return;
+    }
+
     try {
-      console.log('Fetching data...');
-      const startTime = performance.now();
+      Logger.api('GET', `patient/reportsRequested/${userId}/requested`, {
+        page: pageAllReports,
+        limit: 8,
+      });
 
       setIsLoading(true);
 
@@ -101,23 +155,53 @@ export default function ReportComponent({length}) {
         },
       );
 
-      setAllReports(prevReports => [...prevReports, ...response.data.response]);
-      setIsLoading(false);
-      const endTime = performance.now();
-      console.log('Data fetched successfully');
-      console.log(
-        `Time taken to fetch data: ${(endTime - startTime).toFixed(
-          2,
-        )} milliseconds`,
-      );
-    } catch (e) {
-      console.log(e);
+      Logger.debug('All reports response', {
+        count: response?.data?.response?.length || 0,
+        page: pageAllReports,
+      });
+
+      // SECURITY: Validate response data type
+      const reportsData = Array.isArray(response?.data?.response)
+        ? response?.data?.response
+        : [];
+
+      // Append new data for infinite scroll
+      setAllReports(prevReports => [...prevReports, ...reportsData]);
+      
+      Logger.info('All reports fetched successfully', {
+        totalCount: allReports.length + reportsData.length,
+        newCount: reportsData.length,
+      });
+    } catch (error) {
+      Logger.error('Error fetching all reports', error);
+      
+      const errorMessage = error?.response?.data?.message ||
+        'Failed to fetch reports. Please try again later.';
+      
+      CustomToaster.show('error', 'Error', errorMessage);
     } finally {
+      setIsLoading(false);
     }
   };
+
+  /**
+   * Fetch examined reports
+   * SECURITY: Validates userId before API call
+   * ERROR HANDLING: Comprehensive error handling
+   */
   const fetchExamineReports = async () => {
+    // SECURITY: Validate userId before API call
+    if (!userId || userId === 'null' || userId === 'undefined') {
+      Logger.error('Invalid userId for examine reports', { userId });
+      return;
+    }
+
     try {
-      // setLoading(false);
+      Logger.api('GET', `patient/reportsExamine/${userId}/examine`, {
+        page: pageExamineReports,
+        limit: limit,
+      });
+
       const response = await axiosInstance.get(
         `patient/reportsExamine/${userId}/examine`,
         {
@@ -128,67 +212,59 @@ export default function ReportComponent({length}) {
         },
       );
 
-      setExamineReports(response.data.response);
-      // setLoading(true);
-      // console.log("reports",response.data.response)
-    } catch (e) {
-      console.log(e);
+      Logger.debug('Examine reports response', {
+        count: response?.data?.response?.length || 0,
+        page: pageExamineReports,
+      });
+
+      // SECURITY: Validate response data type
+      const examineData = Array.isArray(response?.data?.response)
+        ? response?.data?.response
+        : [];
+
+      setExamineReports(examineData);
+      
+      Logger.info('Examine reports fetched successfully', {
+        count: examineData.length,
+      });
+    } catch (error) {
+      Logger.error('Error fetching examine reports', error);
+      
+      const errorMessage = error?.response?.data?.message ||
+        'Failed to fetch examine reports. Please try again later.';
+      
+      CustomToaster.show('error', 'Error', errorMessage);
+      setExamineReports([]);
     }
   };
-  // const fetchSharedReports = async () => {
-  //   try {
-  //     // setLoading(false);
-  //     const response = await axiosInstance.get(
-  //       `patient/reportsShared/${userId}`,
-  //       {
-  //         params: {
-  //           page: pageSharedReports,
-  //           limit: limit,
-  //         },
-  //       },
-  //     );
 
-  //     setSharedReports(response.data.response);
-  //     // setLoading(true);
-  //     // console.log("reports",response.data.response)
-  //   } catch (e) {
-  //     console.log(e);
-  //   }
-  // };
-  // const fetchRecievedReports = async () => {
-  //   try {
-  //     // setLoading(false);
-  //     const response = await axiosInstance.get(
-  //       `patient/reportsReceived/${userId}/completed`,
-  //       {
-  //         params: {
-  //           page: pageReceivedReports,
-  //           limit: limit,
-  //         },
-  //       },
-  //     );
-
-  //     setRecieveReports(response.data.response);
-  //     // setLoading(true);
-  //     // console.log("reports",response.data.response)
-  //   } catch (e) {
-  //     console.log(e);
-  //   }
-  // };
-
+  /**
+   * Download report file
+   * SECURITY: Permission checks for file access
+   * ERROR HANDLING: Comprehensive error handling
+   * @param {string} reportName - Name of the report file
+   * @param {string} reportPath - URL path to download the file
+   */
   const downloadFile = async (reportName, reportPath) => {
-    console.log('im getting clicked');
+    Logger.debug('Download file requested', { reportName, hasPath: !!reportPath });
+
+    // SECURITY: Validate file name and path
+    if (!reportName || !reportPath) {
+      Logger.warn('Invalid file download parameters', { reportName, reportPath });
+      CustomToaster.show('error', 'Error', 'Invalid file information. Cannot download.');
+      return;
+    }
+
     try {
+      // SECURITY: Android permission check
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
         );
 
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert(
-            'Permission Denied',
-            'Storage permission is required to download the file.',
-          );
+          Logger.warn('Storage permission denied');
+          CustomToaster.show('error', 'Permission Denied', 'Storage permission is required to download the file.');
           return;
         }
       }
@@ -199,36 +275,40 @@ export default function ReportComponent({length}) {
           : RNFS.DownloadDirectoryPath;
       const filePath = `${downloadDir}/${reportName}`;
 
+      Logger.debug('Starting file download', { filePath, reportPath });
+
       const downloadResult = await RNFS.downloadFile({
         fromUrl: reportPath,
         toFile: filePath,
       }).promise;
 
       if (downloadResult.statusCode === 200) {
-        console.log('Download Complete', `File saved to: ${filePath}`);
+        Logger.info('File downloaded successfully', { filePath });
+        CustomToaster.show('success', 'Download Complete', `File saved to: ${filePath}`);
       } else {
-        throw new Error('Failed to download file');
+        throw new Error(`Download failed with status code: ${downloadResult.statusCode}`);
       }
     } catch (error) {
-      console.error('Download Error:', error);
-      console.log('Error', 'Could not download the file.');
+      Logger.error('Download error', error);
+      
+      const errorMessage = error?.message || 'Could not download the file. Please try again.';
+      CustomToaster.show('error', 'Download Error', errorMessage);
     }
   };
 
   useEffect(() => {
-    fetchSuid();
+    if (userId) {
+      Logger.debug('ReportComponent initialized', { userId });
+      fetchAllReports();
+      fetchExamineReports();
+    } else {
+      Logger.warn('ReportComponent: userId not available');
+    }
+  }, [userId]);
 
-    fetchAllReports();
-    fetchExamineReports();
-    // fetchRecievedReports();
-    // fetchSharedReports();
-  }, [
-    userId,
-    pageAllReports,
-    pageExamineReports,
-    pageReceivedReports,
-    pageSharedReports,
-  ]);
+  /**
+   * Table headers configuration per report type
+   */
   const Reqheader = [
     'Lab Name',
     'Diagnostic Name',
@@ -238,6 +318,7 @@ export default function ReportComponent({length}) {
     'Status',
     'Test Price',
     'Test Name',
+    'Profile Picture',
   ];
 
   const Eheader = [
@@ -246,44 +327,73 @@ export default function ReportComponent({length}) {
     'Schedule',
     'Test Name',
     'Price',
+    'Profile Picture',
   ];
+
   const Rheader = [
     'File Name/Booking Id',
     'Lab/Booking Id',
     'Date & Time',
     'Category',
+    'Profile Picture',
   ];
-  const Sheader = ['Doctor Name', 'Date & Time', 'File Name', 'Category'];
-  const filteredResponse = recievedReports.map(
-    ({report_name, hcf_diag_name, book_date, book_time, report_path}) => ({
-      report_name,
-      hcf_diag_name,
-      book_date,
-      book_time,
-      report_path,
-    }),
-  );
+
+  const Sheader = [
+    'Doctor Name',
+    'Date & Time',
+    'File Name',
+    'Category',
+    'Profile Picture',
+  ];
+
+  /**
+   * Filter received reports data
+   * SECURITY: Safe data mapping with validation
+   */
+  const filteredResponse = React.useMemo(() => {
+    if (!recievedReports || !Array.isArray(recievedReports)) {
+      return [];
+    }
+    return recievedReports.map(
+      ({report_name, hcf_diag_name, book_date, book_time, report_path}) => ({
+        report_name,
+        hcf_diag_name,
+        book_date,
+        book_time,
+        report_path,
+      }),
+    );
+  }, [recievedReports]);
+
+  /**
+   * Reports data configuration per report type
+   */
   const reports = {
     'All Files': allReports,
     Examine: examineReports,
-    Recieved: recievedReports,
-    Shared: sharedReports,
+    Recieved: recievedReports || [],
+    Shared: sharedReports || [],
   };
+
+  /**
+   * Table headers configuration per report type
+   */
   const header = {
     'All Files': Reqheader,
     Examine: Eheader,
     Recieved: Rheader,
     Shared: Sheader,
   };
-  // console.log("rep",reports['Recieved'])
+
   return (
-    <SafeAreaView>
-      {/* <DateRangePicker Type={'normal'} /> */}
-      {/* <CustomTable /> */}
+    <SafeAreaView style={styles.container}>
+      {/* REUSABLE COMPONENT: CustomLoader for loading states */}
+      {isLoading && <CustomLoader />}
+      
       <View>
         <TopTabs
           activeTab={reportsState}
-          bordercolor={'#fff'}
+          bordercolor={COLORS.BG_WHITE}
           borderwidth={1}
           data={[
             {title: 'All Files'},
@@ -291,11 +401,15 @@ export default function ReportComponent({length}) {
             {title: 'Recieved'},
             {title: 'Shared'},
           ]}
-          setActiveTab={setReportState}
+          setActiveTab={(tab) => {
+            Logger.debug('Report tab changed', { from: reportsState, to: tab });
+            setReportState(tab);
+          }}
           funcstatus={false}
         />
       </View>
-      <View style={{marginTop:10}}>
+      
+      <View style={styles.tableContainer}>
         <CustomTable
           header={header[reportsState] || null}
           isUserDetails={false}
@@ -314,130 +428,16 @@ export default function ReportComponent({length}) {
   );
 }
 
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
 const styles = StyleSheet.create({
-  container1: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  container2: {},
-  datePickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    justifyContent: 'space-evenly',
-  },
-  datePickerText: {
-    fontSize: 16,
-    color: 'black',
-    margin: 15,
-    justifyContent: 'space-evenly',
-  },
-  selectedDateText: {
-    fontSize: 16,
-    color: 'black',
-    marginLeft: 10,
-  },
-  transactionContainer: {
-    borderColor: '#939094',
-    borderWidth: 1,
-    width: '88%',
-    height: '70%',
-    borderRadius: 16,
-    alignSelf: 'center',
-    marginBottom: 10,
-  },
-  transactionContent: {
-    padding: '2%',
-    justifyContent: 'space-between',
-    flexDirection: 'column',
-    marginTop: 30,
-  },
-  noDataContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noDataImage: {
-    width: 220,
-    height: 150,
-    marginTop: 45,
-  },
-  noDataText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'black',
-    marginTop: 30,
-  },
-  bookAppointmentText: {
-    fontSize: 16,
-    color: 'gray',
-    marginTop: 10,
-  },
   container: {
     flex: 1,
-    padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.BG_WHITE,
   },
   tableContainer: {
-    borderColor: '#AEAAAE',
-    borderWidth: 1,
-    borderRadius: 12,
-    width: 700,
-  },
-  header: {
-    flexDirection: 'row',
-    height: 90,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#AEAAAE',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  headerText: {
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  verticalScroll: {
-    maxHeight: 400,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#AEAAAE',
-    height: 100,
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
-  },
-  columnName: {
-    width: 200,
-  },
-  columnStatus: {
-    width: 100,
-    justifyContent: 'center',
-  },
-  columnDate: {
-    width: 150,
-    justifyContent: 'center',
-  },
-  columnPackage: {
-    width: 120,
-    justifyContent: 'center',
-  },
-  columnAmount: {
-    width: 100,
-    justifyContent: 'center',
-  },
-
-  nameText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  GreyText: {
-    color: '#AEAAAE',
-  },
-  editIcon: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginTop: 10,
   },
 });

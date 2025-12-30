@@ -1,7 +1,33 @@
-import {SafeAreaView, ScrollView, StyleSheet, Text, View} from 'react-native';
-import React, {useEffect, useState} from 'react';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import ClinicHeader from '../../../../components/customComponents/ClinicHeader/ClinicHeader';
+/**
+ * ============================================================================
+ * CLINIC MANAGE SCREEN
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Main screen for Clinic users to manage sales activities and audit logs.
+ * 
+ * FEATURES:
+ * - Tab-based navigation (Sale Activities, Audit)
+ * - Sub-components for sales and audit management
+ * 
+ * SECURITY:
+ * - No direct API calls (delegated to child components)
+ * - Navigation structure only
+ * 
+ * REUSABLE COMPONENTS:
+ * - TopTabs: Tab navigation
+ * - ClinicSalesActivities: Sales activities component
+ * - ClinicAuditLogs: Audit logs component
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * @module ClinicManageScreen
+ */
+
+import {SafeAreaView, ScrollView, StyleSheet, View} from 'react-native';
+import React, {useState} from 'react';
 import TopTabs from '../../../../components/customComponents/TopTabs/TopTabs';
 import ClinicSalesActivities from './ClinicSalesActivities/ClinicSalesActivities';
 import ClinicAuditLogs from './ClinicAuditLogs/ClinicAuditLogs';
@@ -10,89 +36,91 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import { useCommon } from '../../../../Store/CommonContext';
-import CustomTable from '../../../../components/customTable/CustomTable';
-const Stack = createNativeStackNavigator();
+import Logger from '../../../../constants/logger';
+import { COLORS } from '../../../../constants/colors';
+
 export default function ClinicManageScreen() {
-  const [activeTab, setactiveTab] = useState('Sale Activities');
-  
+  const [activeTab, setActiveTab] = useState('Sale Activities');
+
+  /**
+   * Render component based on active tab
+   * @returns {JSX.Element} Component to render
+   */
   const renderComponent = () => {
     switch (activeTab) {
       case 'Sale Activities':
-        return <ClinicSalesActivities/>
+        Logger.debug('Rendering ClinicSalesActivities');
+        return <ClinicSalesActivities />;
       case 'Audit':
-        return <ClinicAuditLogs/>
-    
+        Logger.debug('Rendering ClinicAuditLogs');
+        return <ClinicAuditLogs />;
+      default:
+        Logger.warn('Invalid pub', { activeTab });
+        return null;
     }
   };
-  return (
-    // <SafeAreaView style={{backgroundColor: 'white',flex:1}}>
-      //    <Header
-      //   logo={require('../../../../assets/Clinic1.jpeg')}
-      //   notificationUserIcon={true}
-      //   width={wp(41)}
-      //   height={hp(4)}
-      //   resize={'contain'}
-      //   onlybell={true}
-      // />
-    //   <SafeAreaView style={{backgroundColor: 'white'}}>
-    //     <View style={{padding: 15, gap: 10}}>
-    //       <View>
-    //         <TopTabs
-    //           data={[
-    //             {id: 1, title: 'Sale Activities'},
-    //             {id: 2, title: 'Audit'},
-                
-    //           ]}
-    //           activeTab={activeTab}
-    //           setActiveTab={setactiveTab}
-    //         />
-    //       </View>
-    //       <View style={{marginTop:'5%',backgroundColor:'red'}}>
-    //       <CustomTable
-      
-    //   header={header}
-    //   backgroundkey={'status'}
-    //   isUserDetails={true}
-    //   data={cardData}
-    //   flexvalue={2}
-    //   rowDataCenter={true}
-    //   textCenter={'center'}
-    // />
 
-    //       </View>
-    //     </View>
-    //   </SafeAreaView>
-    // </SafeAreaView>
-    <ScrollView style={{backgroundColor: '#fff'}} nestedScrollEnabled={true}>
-      <SafeAreaView>
-        <View>
-        <Header
-        logo={require('../../../../assets/Clinic1.jpeg')}
-        notificationUserIcon={true}
-        width={wp(41)}
-        height={hp(4)}
-        resize={'contain'}
-        onlybell={true}
-      />
+  return (
+    <ScrollView 
+      style={styles.scrollView} 
+      nestedScrollEnabled={true}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.headerContainer}>
+          <Header
+            logo={require('../../../../assets/Clinic1.jpeg')}
+            notificationUserIcon={true}
+            width={wp(41)}
+            height={hp(4)}
+            resize={'contain'}
+            onlybell={true}
+          />
         </View>
-        <View style={{padding: 15, gap: 10}}>
-          <View>
-          <TopTabs
+        
+        <View style={styles.content}>
+          <View style={styles.tabsContainer}>
+            <TopTabs
               data={[
                 {id: 1, title: 'Sale Activities'},
                 {id: 2, title: 'Audit'},
-                
               ]}
               activeTab={activeTab}
-              setActiveTab={setactiveTab}
+              setActiveTab={setActiveTab}
             />
           </View>
-          <View>{renderComponent()}</View>
+          
+          <View style={styles.componentContainer}>
+            {renderComponent()}
+          </View>
         </View>
       </SafeAreaView>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({});
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: COLORS.BG_WHITE,
+    flex: 1,
+  },
+  scrollView: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  headerContainer: {
+    // Header container styling
+  },
+  content: {
+    padding: 15,
+    gap: 10,
+  },
+  tabsContainer: {
+    // Tabs container styling
+  },
+  componentContainer: {
+    // Component container styling
+  },
+});

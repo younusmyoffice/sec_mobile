@@ -22,7 +22,10 @@ const BookAppointmenrtDateSelector = ({
   // const [availableDurations, setAvailableDurations] = useState([]);
 
   console.log('availableDurations', availableDurations);
+  console.log('📅 DateSelector - Current patientdetails:', patientdetails);
+  
   const handleChange = (name, value) => {
+    console.log(`📅 DateSelector - Setting ${name}:`, value);
     SetPatientDetails(prevData => ({
       ...prevData,
       [name]: value,
@@ -130,18 +133,6 @@ const BookAppointmenrtDateSelector = ({
               value={patientdetails['duration']}
               onChange={handleChange}
             />
-          </View>
-          <View style={{padding: 10, alignSelf: 'center'}}>
-            {/* <CustomButton
-              title="Next"
-              bgColor={'#E72B4A'}
-              borderRadius={30}
-              fontSize={22}
-              textColor={'white'}
-              width={250}
-              padding={5}
-              
-            /> */}
           </View>
         </View>
       </SafeAreaView>

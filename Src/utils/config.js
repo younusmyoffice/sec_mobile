@@ -9,7 +9,7 @@ const CURRENT_ENV = ENV.DEVELOPMENT; // Change to ENV.PRODUCTION for production
 
 const CONFIG = {
   [ENV.DEVELOPMENT]: {
-    baseUrl: 'http://192.168.0.132:3000/sec/',
+    baseUrl: 'http://localhost:3000/sec/',
     apiTimeout: 10000,
     debug: true
   },

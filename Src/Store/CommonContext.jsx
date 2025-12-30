@@ -52,7 +52,7 @@ const CommonProvider = ({children}) => {
 
   const fetchSharedReports = async () => {
     try {
-      // setLoading(false);
+      console.log('🔄 Fetching shared reports for userId:', userId);
       const response = await axiosInstance.get(
         `patient/reportsShared/${userId}`,
         {
@@ -63,11 +63,13 @@ const CommonProvider = ({children}) => {
         },
       );
 
+      console.log('📥 Shared Reports API Response:', response.data);
+      console.log('📥 Shared Reports Response Data:', response.data.response);
+      console.log('📥 Shared Reports Count:', response.data.response?.length || 0);
+      
       setSharedReports(response.data.response);
-      // setLoading(true);
-      // console.log("reports",response.data.response)
     } catch (e) {
-      console.log(e);
+      console.log('❌ Error fetching shared reports:', e);
     }
   };
   const fetchRecievedReports = async status => {
@@ -123,8 +125,6 @@ const CommonProvider = ({children}) => {
 
     console.log('Fetching data for', department);
     try {
-      console.log('Doctors by department:--', response?.data?.response);
-
       const response = await axiosInstance.get(
         `patient/getdoctorsByDept/${department}/3`,
       );
@@ -208,19 +208,32 @@ const CommonProvider = ({children}) => {
 
   console.log('idfdsfdsa', userId);
 
-   const handleVerify = async (verifyOtp,setisSuccess,isSuccess,settitle) => {
+   const handleVerify = async (verifyOtp, setisSuccess, isSuccess, settitle) => {
       try {
         setLoad(false);
-        console.log('ruko zara sabar karo,hojayega');
+        console.log('🔐 Verifying doctor email OTP:', verifyOtp);
+        
         const response = await axiosInstance.post('auth/verifyEmail', verifyOtp);
-        console.log(response.data.response?.suid);
-        setDoctorId(response.data.response?.suid)
-        setLoad(true);
-  
-        setisSuccess(!isSuccess);
-        settitle('User Registered Successfully');
+        console.log('✅ Email verification response:', response.data);
+        
+        if (response.data?.response?.suid) {
+          setDoctorId(response.data.response.suid);
+          setLoad(true);
+          setisSuccess(!isSuccess);
+          settitle('Doctor Registered Successfully');
+          console.log('✅ Doctor verification successful, doctor_id:', response.data.response.suid);
+        } else {
+          console.log('⚠️ No suid in response');
+          throw new Error('Invalid response from server');
+        }
       } catch (error) {
-        console.log(error);
+        console.error('❌ Email verification failed:', error);
+        setLoad(false);
+        // Show error message to user
+        if (error.response?.data?.message) {
+          console.log('❌ Server error:', error.response.data.message);
+        }
+        throw error; // Re-throw to let the UI handle the error
       }
     };
 

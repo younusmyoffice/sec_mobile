@@ -1,85 +1,70 @@
+/**
+ * ============================================================================
+ * COMPONENT: Blocked Staff List
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Component for displaying blocked staff list in a table format
+ * 
+ * SECURITY:
+ * - No direct API calls, receives data as prop
+ * - Read-only display component
+ * 
+ * @module Blocked
+ */
+
 import {
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
-  } from 'react-native';import React from 'react'
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+import React from 'react';
 import {
-    widthPercentageToDP as wp,
-    heightPercentageToDP as hp,
-  } from 'react-native-responsive-screen';
-import PaginationComponent from '../../../../components/customPagination/PaginationComponent';
+  widthPercentageToDP as wp,
+  heightPercentageToDP as hp,
+} from 'react-native-responsive-screen';
+
+// Utils & Constants
+import Logger from '../../../../constants/logger'; // UTILITY: Structured logging
+import {COLORS} from '../../../../constants/colors'; // DESIGN: Color constants
+import {getProfileImageSource} from '../../../../utils/imageUtils'; // UTILITY: Image handling
+
 const Blocked = ({data}) => {
-    const cardData = [
-        {
-          first_name: 'John',
-          last_name: 'Doe',
-          role_id: '001',
-          department_name: 'Cardiology',
-          is_active: true,
-          booking_id: 102,
-        },
-        {
-          first_name: 'Jane',
-          last_name: 'Smith',
-          role_id: '002',
-          department_name: 'Neurology',
-          is_active: false,
-          booking_id: 102,
-        },
-        {
-          first_name: 'Alice',
-          last_name: 'Brown',
-          role_id: '003',
-          department_name: 'Pediatrics',
-          is_active: true,
-          booking_id: 102,
-        },
-        {
-          first_name: 'Michael',
-          last_name: 'Johnson',
-          role_id: '004',
-          department_name: 'Orthopedics',
-          is_active: false,
-          booking_id: 102,
-        },
-        {
-          first_name: 'John',
-          last_name: 'Doe',
-          role_id: '001',
-          department_name: 'Cardiology',
-          is_active: true,
-          booking_id: 102,
-        },
-        {
-          first_name: 'Jane',
-          last_name: 'Smith',
-          role_id: '002',
-          department_name: 'Neurology',
-          is_active: false,
-          booking_id: 102,
-        },
-        {
-          first_name: 'Alice',
-          last_name: 'Brown',
-          role_id: '003',
-          department_name: 'Pediatrics',
-          is_active: true,
-          booking_id: 102,
-        },
-        {
-          first_name: 'Michael',
-          last_name: 'Johnson',
-          role_id: '004',
-          department_name: 'Orthopedics',
-          is_active: false,
-          booking_id: 102,
-        },
-      ];
+  Logger.debug('Blocked component rendered', {
+    dataLength: data?.length || 0,
+    isArray: Array.isArray(data),
+  });
+
+  // LOADING STATE: Show loading message if data is undefined
+  if (data === undefined) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centered}>
+          <Text style={styles.loadingText}>Loading blocked staff...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // EMPTY STATE: Show empty message if no data
+  if (!data || data.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centered}>
+          <Text style={styles.emptyTitle}>No blocked staff found</Text>
+          <Text style={styles.emptySubtitle}>
+            All staff members are currently active
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  // Use API data instead of hardcoded data
   return (
     <SafeAreaView>
       <ScrollView horizontal={true} style={{marginBottom: 20}}>
@@ -103,7 +88,7 @@ const Blocked = ({data}) => {
               </Text> */}
             </View>
             <ScrollView>
-              {data.map((data, index) => (
+              {data.map((item, index) => (
                 <View key={index} style={styles.card}>
                   <View
                     style={{
@@ -113,27 +98,17 @@ const Blocked = ({data}) => {
                     }}>
                     <View>
                       <Image
-                        source={require('../../../../assets/cimg.png')}
-                        style={{
-                          height: hp(7),
-                          width: wp(17),
-                          borderRadius: 15,
-                          resizeMode: 'contain',
-                        }}
+                        source={getProfileImageSource(item?.profile_picture)} // UTILITY: Standardized image handling
+                        style={styles.profileImage}
                       />
                     </View>
                     <View>
-                      <Text
-                        style={{color: 'black', fontFamily: 'Poppins-Medium'}}>
-                        {data?.first_name} {data?.last_name}
+                      <Text style={styles.nameText}>
+                        {item?.first_name || ''} {item?.last_name || ''}
                       </Text>
-                      <Text
-                        style={{
-                          color: '#939094',
-                          fontFamily: 'Poppins-Medium',
-                          fontSize: hp(1.4),
-                        }}>
-                        {data?.department_name} | Booking Id:{data?.booking_id}
+                      <Text style={styles.detailsText}>
+                        {item?.lab_department_name || 'N/A'} | Staff ID:{' '}
+                        {item?.staff_id || 'N/A'}
                       </Text>
                     </View>
                   </View>
@@ -141,27 +116,27 @@ const Blocked = ({data}) => {
                   <View style={styles.columnStatus}>
                     <TouchableWithoutFeedback>
                       <Text
-                        style={{
-                          color: data.is_active ? '#E72B4A' : 'black',
-                          textAlign: 'center',
-                          fontFamily: 'Poppins-Medium',
-                          borderWidth: data.is_active ? 1 : 0.5,
-                          borderRadius: 15,
-                          padding: 7,
-                          borderColor: data.is_active ? '#E72B4A' : '#939094',
-                          fontSize: hp(1.5),
-                        }}>
-                        {data?.is_active ? 'Active' : 'In-Active'}
+                        style={[
+                          styles.statusText,
+                          item.diag_status === 0
+                            ? styles.statusBlocked
+                            : styles.statusActive,
+                        ]}>
+                        {item?.diag_status === 0 ? 'Blocked' : 'Active'}
                       </Text>
                     </TouchableWithoutFeedback>
                   </View>
 
                   <View style={[styles.columnDate, {left: 50}]}>
-                    <Text style={styles.GreyText}>date and time</Text>
+                    <Text style={styles.GreyText}>
+                      {item?.hcf_diag_name || 'N/A'}
+                    </Text>
                   </View>
 
                   <View style={[styles.columnPackage, {left: 50}]}>
-                    <Text style={styles.GreyText}>-hlhjk</Text>
+                    <Text style={styles.GreyText}>
+                      {item?.email || 'N/A'}
+                    </Text>
                   </View>
 
                 
@@ -244,53 +219,97 @@ const styles = StyleSheet.create({
     container: {
       flex: 1,
       padding: 10,
-      backgroundColor: '#fff',
+      backgroundColor: COLORS.BG_WHITE, // DESIGN: Use color constant
+    },
+    centered: {
+      padding: 20,
+      alignItems: 'center',
+    },
+    loadingText: {
+      fontSize: 16,
+      color: COLORS.TEXT_SECONDARY, // DESIGN: Use color constant
+      fontFamily: 'Poppins-Medium',
+    },
+    emptyTitle: {
+      fontSize: 16,
+      color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
+      fontFamily: 'Poppins-Medium',
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      color: COLORS.TEXT_GRAY, // DESIGN: Use color constant
+      marginTop: 5,
+      fontFamily: 'Poppins-Regular',
+    },
+    profileImage: {
+      height: hp(7),
+      width: wp(17),
+      borderRadius: 15,
+      resizeMode: 'contain',
+    },
+    nameText: {
+      color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
+      fontFamily: 'Poppins-Medium',
+    },
+    detailsText: {
+      color: COLORS.TEXT_GRAY, // DESIGN: Use color constant
+      fontFamily: 'Poppins-Medium',
+      fontSize: hp(1.4),
+    },
+    statusText: {
+      textAlign: 'center',
+      fontFamily: 'Poppins-Medium',
+      borderWidth: 1,
+      borderRadius: 15,
+      padding: 7,
+      fontSize: hp(1.5),
+    },
+    statusBlocked: {
+      color: COLORS.PRIMARY, // DESIGN: Use color constant
+      borderColor: COLORS.PRIMARY, // DESIGN: Use color constant
+    },
+    statusActive: {
+      color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
+      borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
+      borderWidth: 0.5,
     },
   
     tableContainer: {
-      borderColor: '#AEAAAE',
+      borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
       borderWidth: 1,
       borderRadius: 12,
       width: 1000,
     },
-  
     header: {
       flexDirection: 'row',
       height: 90,
       alignItems: 'center',
       borderBottomWidth: 1,
-      borderColor: '#AEAAAE',
+      borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
       justifyContent: 'space-between',
       paddingHorizontal: 20,
     },
     headerText: {
       fontWeight: '600',
       fontSize: 16,
-      color: '#313033',
+      color: COLORS.TEXT_PRIMARY, // DESIGN: Use color constant
       fontFamily: 'Poppins-Medium',
     },
-  
-    verticalScroll: {
-      maxHeight: 400,
-    },
-  
     card: {
       flexDirection: 'row',
       alignItems: 'center',
       borderBottomWidth: 1,
-      borderColor: '#AEAAAE',
+      borderColor: COLORS.BORDER_LIGHT, // DESIGN: Use color constant
       height: hp(11),
       paddingHorizontal: 20,
       justifyContent: 'space-between',
     },
-  
     columnName: {
       minWidth: 200,
     },
     columnStatus: {
       width: wp(20),
       justifyContent: 'center',
-  
       textAlign: 'center',
     },
     columnDate: {
@@ -302,30 +321,11 @@ const styles = StyleSheet.create({
       width: 120,
       justifyContent: 'center',
     },
-    columnAmount: {
-      width: 100,
-      justifyContent: 'center',
-    },
-  
-    nameText: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: '#313033',
-    },
     GreyText: {
       fontFamily: 'Poppins-Medium',
-      color: '#939094',
+      color: COLORS.TEXT_GRAY, // DESIGN: Use color constant
       fontSize: hp(1.7),
     },
-  
-    editIcon: {
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    amount: {
-      color: '#E72B4A',
-      fontFamily: 'Poppins-Medium',
-      fontSize: hp(1.8),
-    },
   });
-export default Blocked
+
+export default Blocked;

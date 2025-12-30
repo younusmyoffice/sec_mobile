@@ -1,4 +1,20 @@
+/**
+ * ============================================================================
+ * AUTHENTICATION STYLES
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Centralized styling for authentication screens (Login, Register, etc.).
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * @module AuthenticationStyle
+ */
+
 import {StyleSheet} from 'react-native';
+import { COLORS } from '../constants/colors';
 
 const authenticationStyle = StyleSheet.create({
   container: {
@@ -7,11 +23,10 @@ const authenticationStyle = StyleSheet.create({
     height: 'auto',
     gap: 15,
     justifyContent: 'center',
-    //  backgroundColor:'red'
   },
   signUp: {
     fontSize: 25,
-    color: '#333',
+    color: COLORS.TEXT_PRIMARY,
     marginTop: 10,
     fontWeight: '500',
     textAlign: 'center',
@@ -28,25 +43,23 @@ const authenticationStyle = StyleSheet.create({
   forgot: {
     fontSize: 19,
     textAlign: 'center',
-    color: '#E72B4A',
+    color: COLORS.PRIMARY,
   },
-
   pinCodeContainer: {
     borderRadius: 0,
-    // borderLeftWidth:0,
     borderWidth: 0,
-    borderBottomWidth: 1, 
+    borderBottomWidth: 1,
     width: 50,
-    borderColor: 'black',
+    borderColor: COLORS.TEXT_PRIMARY,
   },
   pinCodeText: {
-    color: '#E72B4A',
+    color: COLORS.PRIMARY,
   },
   focusedPinCodeContainerStyle: {
-    borderColor: '#E72B4A',
+    borderColor: COLORS.PRIMARY,
   },
   focusStick: {
-    backgroundColor: '#E72B4A',
+    backgroundColor: COLORS.PRIMARY,
   },
 });
 

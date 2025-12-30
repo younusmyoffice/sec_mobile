@@ -18,7 +18,7 @@ const HandleEmailVerifyModal = ({visible, setVisible, email}) => {
   });
 
   const handleEmailOtpverify = async () => {
-    console.log(verifyOtp);
+    console.log('🔐 Verifying email OTP:', verifyOtp);
   
     try {
       const response = await axiosInstance.post(
@@ -26,14 +26,20 @@ const HandleEmailVerifyModal = ({visible, setVisible, email}) => {
         verifyOtp
       );
   
+      console.log('✅ Email verification response:', response.data);
+      
       CustomToaster.show('success', 'Email Verified', 'Email verification successful');
        
       setVisible(false); 
     } catch (error) {
+      console.error('❌ Email verification failed:', error);
+      
       let errorMessage = 'Something went wrong. Please try again.';
   
-      if (error.response) {
-        errorMessage = error.response.data?.message || error.response.statusText;
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
       } else if (error.request) {
         errorMessage = 'No response from the server. Please check your connection.';
       } else {

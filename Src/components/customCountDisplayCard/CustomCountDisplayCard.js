@@ -6,9 +6,10 @@ import {
 } from 'react-native-responsive-screen';
 
 export default function CustomCountDisplayCard({cards}) {
-  // console.log(cards.length % 2 !== 0)
-  // console.log(cards.length % 2 !== 0)
-  console.log(cards)
+  console.log('🎯 CustomCountDisplayCard received cards:', cards);
+  console.log('🎯 Cards type:', typeof cards);
+  console.log('🎯 Cards length:', cards?.length);
+  console.log('🎯 Cards is array:', Array.isArray(cards));
   return (
     <View>
       <View

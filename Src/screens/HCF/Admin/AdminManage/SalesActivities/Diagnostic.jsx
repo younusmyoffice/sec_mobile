@@ -11,7 +11,7 @@ import {
 import React from 'react';
 import CustomTable from '../../../../../components/customTable/CustomTable';
 
-const Diagnostic = ({header, data}) => {
+const Diagnostic = ({header, data, isloading}) => {
   return (
     <View>
       <CustomTable
@@ -21,6 +21,7 @@ const Diagnostic = ({header, data}) => {
         flexvalue={2}
         isUserDetails={true}
         rowTextCenter={true}
+        loading={isloading}
       />
     </View>
   );

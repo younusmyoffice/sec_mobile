@@ -1,4 +1,4 @@
-import {StyleSheet, Text, View, ScrollView, SafeAreaView} from 'react-native';
+import {StyleSheet, Text, View, ScrollView, SafeAreaView, Alert} from 'react-native';
 import React, {useState} from 'react';
 import CustomInput from '../../../../components/customInputs/CustomInputs';
 import InAppHeader from '../../../../components/customComponents/InAppHeadre/InAppHeader';
@@ -8,8 +8,10 @@ import {widthPercentageToDP} from 'react-native-responsive-screen';
 import axiosInstance from '../../../../utils/axiosInstance';
 import {useCommon} from '../../../../Store/CommonContext';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import {useNavigation} from '@react-navigation/native';
 
 export default function AddExperience() {
+  const navigation = useNavigation();
   const {userId} = useCommon();
 
   const staff = [
@@ -51,10 +53,16 @@ export default function AddExperience() {
   };
 
   const addExperiences = async () => {
-    console.log('Submitting formData:', {...formData, suid: userId});
+    console.log('💼 Submitting experience formData:', {...formData, suid: userId});
+
+    // Validate required fields
+    if (!formData.job || !formData.organisation || !formData.from_date || !formData.to_date) {
+      Alert.alert('Missing Information', 'Please fill in all required fields (Job Title, Organisation, From Date, and To Date)');
+      return;
+    }
 
     if (new Date(formData.from_date) >= new Date(formData.to_date)) {
-      alert("The 'From Date' must be earlier than the 'To Date'.");
+      Alert.alert('Invalid Dates', "The 'From Date' must be earlier than the 'To Date'.");
       return;
     }
 
@@ -71,24 +79,39 @@ export default function AddExperience() {
         },
       );
 
-      // if (response.data.success) {
-      //   alert('Experience saved successfully!');
-      //   setFormData({
-      //     job: '',
-      //     organisation: '',
-      //     from_date: '',
-      //     to_date: '',
-      //   });
-      // } else {
-      //   alert('Failed to save experience. Please try again.');
-      // }
-      console.log('Submitting formDatawww:', formData);
+      console.log('💼 Experience API response:', response.data);
 
+      // Check for success in multiple possible response formats
+      const isSuccess = response.data?.response?.body || 
+                       response.data?.success === true || 
+                       response.data?.status === 'success' ||
+                       response.status === 200;
+      
+      if (isSuccess) {
+        Alert.alert('Success!', 'Experience added successfully', [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate back to ProfileScreenDoctor
+              navigation.goBack();
+            }
+          }
+        ]);
+        setFormData({
+          job: '',
+          organisation: '',
+          from_date: '',
+          to_date: '',
+        });
+      } else if (response.data?.error) {
+        Alert.alert('Error', `Failed to add experience: ${response.data.error}`);
+      } else {
+        Alert.alert('Error', 'Failed to save experience. Please try again.');
+      }
     } catch (e) {
-      console.error('Error occurred:', e.message);
-      alert(
-        'An error occurred while saving your experience. Please try again.',
-      );
+      console.error('💼 Error occurred:', e.message);
+      console.error('💼 Error details:', e.response?.data);
+      Alert.alert('Error', 'An error occurred while saving your experience. Please try again.');
     }
   };
 

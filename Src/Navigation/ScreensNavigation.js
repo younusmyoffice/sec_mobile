@@ -5,6 +5,7 @@ import AdminDashboardScreen from '../screens/HCF/Admin/AdminDashboard/AdminDashb
 import AdminDoctorsScreen from '../screens/HCF/Admin/AdminDoctors/AdminDoctorsScreen';
 import AdminManageScreen from '../screens/HCF/Admin/AdminManage/AdminManageScreen';
 import AdminDiagnosticScreen from '../screens/HCF/Admin/AdminDiagnostic/AdminDiagnosticScreen';
+import AdminProfileScreen from '../screens/HCF/Admin/AdminProfile/AdminProfileScreen';
 import CustomNotificationList from '../components/customNotificationList/CustomNotificationList';
 import ProfileInfoMainScreen from '../screens/patient/dashboard-DF/ProfileScreens/ProfileInfoMainScreen';
 import NotificationScreen from '../screens/additionalScreens/NotificationScreen';
@@ -288,6 +289,11 @@ export const AdminHomeScreensStack = () => {
       <SEC.Screen
         name="admin-dashboard"
         component={AdminDashboardScreen}
+        options={{headerShown: false}}
+      />
+      <SEC.Screen
+        name="admin-profile"
+        component={AdminProfileScreen}
         options={{headerShown: false}}
       />
     </SEC.Navigator>

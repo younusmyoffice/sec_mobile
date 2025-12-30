@@ -140,7 +140,23 @@
 
 // export default DiagnosticSalesActivities;
 
-import { View, Text, ActivityIndicator } from 'react-native';
+/**
+ * ============================================================================
+ * DIAGNOSTIC SALES ACTIVITIES
+ * ============================================================================
+ *
+ * PURPOSE:
+ * Display diagnostic sales activities in a table with robust error handling.
+ *
+ * SECURITY:
+ * - Uses axiosInstance for authenticated API calls.
+ * - Validates userId before API calls.
+ *
+ * ERROR HANDLING:
+ * - User feedback via CustomToaster.
+ * - Graceful empty-state handling.
+ */
+import { View, Text, StyleSheet } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import CheckBox from '@react-native-community/checkbox';
 import {
@@ -149,9 +165,12 @@ import {
 } from 'react-native-responsive-screen';
 import CustomInput from '../../../../../components/customInputs/CustomInputs';
 import CustomTable from '../../../../../components/customTable/CustomTable';
-import axios from 'axios';
-import { baseUrl } from '../../../../../utils/baseUrl';
+import axiosInstance from '../../../../../utils/axiosInstance';
 import { useCommon } from '../../../../../Store/CommonContext';
+import CustomToaster from '../../../../../components/customToaster/CustomToaster';
+import CustomLoader from '../../../../../components/customComponents/customLoader/CustomLoader';
+import Logger from '../../../../../constants/logger';
+import { COLORS } from '../../../../../constants/colors';
 
 const DiagnosticSalesActivities = () => {
   const [checkboxes, setCheckboxes] = useState([
@@ -179,20 +198,39 @@ const DiagnosticSalesActivities = () => {
 
   useEffect(() => {
     const fetchSalesActivities = async () => {
+      // SECURITY: Validate userId before API call
+      if (!userId || userId === 'null' || userId === 'undefined') {
+        Logger.error('Invalid userId for sales activities', { userId });
+        CustomToaster.show('error', 'Error', 'Invalid user session. Please login again.');
+        setData([]);
+        setFilteredData([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
-        const response = await axios.get(`${baseUrl}sec/hcf/${userId}/diagnosticManageSaleActivity`);
-        
-        if (response.data && response.data.response) {
-          setData(response.data.response);
-          setFilteredData(response.data.response);
+        Logger.api('GET', `hcf/${userId}/diagnosticManageSaleActivity`);
+        const response = await axiosInstance.get(`hcf/${userId}/diagnosticManageSaleActivity`);
+
+        const body = response?.data?.response;
+        if (Array.isArray(body)) {
+          setData(body);
+          setFilteredData(body);
+          Logger.info('Sales activities fetched', { count: body.length });
+        } else if (Array.isArray(response?.data)) {
+          setData(response.data);
+          setFilteredData(response.data);
+          Logger.info('Sales activities fetched (array root)', { count: response.data.length });
         } else {
-          console.warn("Received empty sales activity data");
+          Logger.warn('Sales activities: empty or unexpected response');
           setData([]);
           setFilteredData([]);
         }
       } catch (error) {
-        console.error("Error fetching sales activity data:", error);
+        Logger.error('Sales activities fetch failed', error);
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch sales activities.';
+        CustomToaster.show('error', 'Error', errorMessage);
         setData([]);
         setFilteredData([]);
       } finally {
@@ -219,11 +257,27 @@ const DiagnosticSalesActivities = () => {
   }, [checkboxes, data]);
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#0000ff" />;
+    return (
+      <View style={styles.loaderContainer}>
+        <CustomLoader />
+        <Text style={styles.loaderText}>Loading sales activities...</Text>
+      </View>
+    );
+  }
+
+  if (!loading && filteredData.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyTitle}>No sales activities data available</Text>
+        <Text style={styles.emptySubtext}>
+          Data: {data.length} items, Filtered: {filteredData.length} items
+        </Text>
+      </View>
+    );
   }
 
   return (
-    <View style={{ gap: 10 }}>
+    <View style={styles.container}>
       {/* Checkbox Filters */}
       {/* <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         {checkboxes.map((item) => (
@@ -243,7 +297,7 @@ const DiagnosticSalesActivities = () => {
       </View> */}
 
       {/* Filters */}
-      <View style={{ alignSelf: 'center' }}>
+      <View style={styles.filtersContainer}>
         
       </View>
 
@@ -251,14 +305,18 @@ const DiagnosticSalesActivities = () => {
       <CustomTable
         header={header}
         isUserDetails={false}
-        data={filteredData.map((item) => ({
-          id: item.suid,
-          name: `${item.first_name} ${item.middle_name ? item.middle_name + ' ' : ''}${item.last_name}`,
-          status: item.status.charAt(0).toUpperCase() + item.status.slice(1), // Capitalize first letter
-          datetime: new Date(item.updated_at).toLocaleString(), // Format date
-          package: item.test_name,
-          price: `$${item.test_price}`,
-        }))}
+        data={(() => {
+          const mappedData = filteredData.map((item) => ({
+            id: item.suid || item.id,
+            name: `${item.first_name || ''} ${item.middle_name ? item.middle_name + ' ' : ''}${item.last_name || ''}`.trim(),
+            status: item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Unknown',
+            datetime: item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A',
+            package: item.test_name || item.package || 'N/A',
+            price: item.test_price ? `$${item.test_price}` : 'N/A',
+          }));
+          Logger.debug('Mapped sales activities', { count: mappedData.length });
+          return mappedData;
+        })()}
         flexvalue={1}
         rowDataCenter={true}
         textCenter="center"
@@ -268,3 +326,39 @@ const DiagnosticSalesActivities = () => {
 };
 
 export default DiagnosticSalesActivities;
+
+const styles = StyleSheet.create({
+  container: {
+    gap: 10,
+  },
+  filtersContainer: {
+    alignSelf: 'center',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: COLORS.TEXT_PRIMARY,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: COLORS.TEXT_GRAY,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    color: COLORS.TEXT_GRAY,
+    marginTop: 10,
+  },
+});

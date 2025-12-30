@@ -30,8 +30,11 @@ const PatientDetails = ({data, patientdetails, SetPatientDetails,isLoginValid, s
   // });
   const [errors, setErrors] = useState({});
   console.log("errors",errors)
+  console.log('👤 PatientDetails - Current patientdetails:', patientdetails);
+  
   const handleChange = useCallback(
     (name, value) => {
+      console.log(`👤 PatientDetails - Setting ${name}:`, value);
       SetPatientDetails(prevState => ({
         ...prevState,
         [name]: value,

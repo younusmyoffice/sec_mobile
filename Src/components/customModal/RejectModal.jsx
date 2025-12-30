@@ -109,7 +109,7 @@ const RejectModal = ({ isVisible, onClose, onSubmit,apptData }) => {
           <View style={{ alignSelf: 'center', marginTop: 20 }}>
             <CustomButton
               title="Submit"
-              borderColor={18}
+              borderColor={'#E72B4A'}
               bgColor={'#E72B4A'}
               textColor={'white'}
               width={200}

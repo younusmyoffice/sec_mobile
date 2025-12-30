@@ -1,5 +1,5 @@
 import {View, Text} from 'react-native';
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import CustomSearch from '../../../../../components/customSearch/CustomSearch';
 import CustomInput from '../../../../../components/customInputs/CustomInputs';
 import {
@@ -7,9 +7,50 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import CustomTransactionTable from '../../../../../components/customTable/CustomTransactionTable';
+import axiosInstance from '../../../../../utils/axiosInstance';
+import {useAuth} from '../../../../../Store/Authentication';
+
 const Bookings = () => {
+  const {userId} = useAuth();
+  const [transactionData, setTransactionData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchTransactionData = async () => {
+    try {
+      setIsLoading(true);
+      console.log('📊 Fetching HCF transaction data for HCF ID:', userId);
+      
+      const response = await axiosInstance.get(
+        `hcf/getHcfAdminTransaction/${userId}`
+      );
+      
+      console.log('✅ Transaction data response:', response.data);
+      
+      if (response.data?.response) {
+        setTransactionData(response.data.response);
+      } else {
+        console.log('⚠️ No transaction data received');
+        setTransactionData([]);
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to fetch transaction data:', error);
+      setTransactionData([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchTransactionData();
+    }
+  }, [userId]);
+
   const header = ['Transaction & ID', 'Date & Time', 'Amount'];
-  const data = [
+  
+  // Fallback hardcoded data if no API data
+  const fallbackData = [
     {
       id: 1,
       image: require('../../../../../assets/Recieve.png'),
@@ -35,6 +76,8 @@ const Bookings = () => {
       price: 200.98,
     },
   ];
+
+  const displayData = transactionData.length > 0 ? transactionData : fallbackData;
   return (
     <View style={{gap: 10}}>
       <View style={{flexDirection: 'row'}}>
@@ -69,7 +112,7 @@ const Bookings = () => {
         </View>
       </View>
 
-     <CustomTransactionTable header={header} textCenter={'center'} data={data}/>
+     <CustomTransactionTable header={header} textCenter={'center'} data={displayData}/>
     </View>
   );
 };

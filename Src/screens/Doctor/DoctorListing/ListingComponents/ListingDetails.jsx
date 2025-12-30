@@ -10,7 +10,7 @@ import axiosInstance from '../../../../utils/axiosInstance';
 import { useCommon } from '../../../../Store/CommonContext';
 import CustomToaster from '../../../../components/customToaster/CustomToaster';
 
-export default function ListingDetails({ setActiveTab, listingId, onListingIdChange }) {
+export default function ListingDetails({ setActiveTab, listingId, onListingIdChange, editMode = false, existingListing = null, existingListingDetails = null, onListingUpdated }) {
   const [listingIdState, setListingIdState] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -19,12 +19,12 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
   const [endTime, setEndTime] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    listingName: '',
-    startDate: '',
-    endDate: '',
-    workingTimeStart: '',
-    workingTimeEnd: '',
-    about: '',
+    listingName: editMode && existingListing ? existingListing.listing_name || '' : '',
+    startDate: editMode && existingListing ? existingListing.working_days_start || '' : '',
+    endDate: editMode && existingListing ? existingListing.working_days_end || '' : '',
+    workingTimeStart: editMode && existingListing ? existingListing.working_time_start || '' : '',
+    workingTimeEnd: editMode && existingListing ? existingListing.working_time_end || '' : '',
+    about: editMode && existingListing ? existingListing.about || '' : '',
   });
   const [errors, setErrors] = useState({
     listingName: '',
@@ -35,6 +35,87 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
     about: '',
   });
   const { userId } = useCommon();
+
+  // Handle existing listing details data when in edit mode
+  useEffect(() => {
+    if (editMode && existingListingDetails) {
+      console.log('📝 ListingDetails - existingListingDetails received:', existingListingDetails);
+      
+      setFormData({
+        listingName: existingListingDetails.listing_name || '',
+        startDate: existingListingDetails.working_days_start || '',
+        endDate: existingListingDetails.working_days_end || '',
+        workingTimeStart: existingListingDetails.working_time_start || '',
+        workingTimeEnd: existingListingDetails.working_time_end || '',
+        about: existingListingDetails.about || '',
+      });
+      
+      // Set the dates for the calendar
+      if (existingListingDetails.working_days_start) {
+        setStartDate(existingListingDetails.working_days_start);
+      }
+      if (existingListingDetails.working_days_end) {
+        setEndDate(existingListingDetails.working_days_end);
+      }
+      
+      // Set the times
+      if (existingListingDetails.working_time_start) {
+        const startTimeDate = parseTimeToDate(existingListingDetails.working_time_start);
+        if (startTimeDate) {
+          setStartTime(startTimeDate);
+        }
+      }
+      if (existingListingDetails.working_time_end) {
+        const endTimeDate = parseTimeToDate(existingListingDetails.working_time_end);
+        if (endTimeDate) {
+          setEndTime(endTimeDate);
+        }
+      }
+      
+      console.log('📝 ListingDetails - form data updated with:', {
+        listingName: existingListingDetails.listing_name,
+        startDate: existingListingDetails.working_days_start,
+        endDate: existingListingDetails.working_days_end,
+        workingTimeStart: existingListingDetails.working_time_start,
+        workingTimeEnd: existingListingDetails.working_time_end,
+        about: existingListingDetails.about,
+      });
+    }
+  }, [editMode, existingListingDetails]);
+
+  // Helper function to format time for display
+  const formatTimeForDisplay = (timeValue) => {
+    if (!timeValue) return '';
+    
+    // If it's a Date object, format it to HH:mm
+    if (timeValue instanceof Date) {
+      const hours = timeValue.getHours().toString().padStart(2, '0');
+      const minutes = timeValue.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+    
+    // If it's already a time string like "21:33:42", format it to "21:33"
+    if (typeof timeValue === 'string' && timeValue.includes(':')) {
+      const parts = timeValue.split(':');
+      return `${parts[0]}:${parts[1]}`;
+    }
+    
+    return timeValue.toString();
+  };
+
+  const parseTimeToDate = (timeString) => {
+    if (!timeString) {
+      return null;
+    }
+    let normalized = timeString;
+    if (/^\d{2}:\d{2}$/.test(timeString)) {
+      normalized = `${timeString}:00`;
+    } else if (/^\d{2}:\d{2}:\d{2}:\d{1,3}$/.test(timeString)) {
+      normalized = timeString.replace(/:(\d{1,3})$/, '.$1'); // convert trailing :ms to .ms
+    }
+    const parsed = new Date(`1970-01-01T${normalized}`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
 
   const handleDayPress = (day) => {
     if (!startDate || (endDate && day.dateString <= startDate)) {
@@ -117,14 +198,16 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
     } else if (name === 'startTime') {
       newErrors.startTime = !value ? 'Start Time is required' : '';
       if (value && endTime) {
-        const start = new Date(`1970-01-01T${value}:00`);
-        const end = new Date(`1970-01-01T${endTime}:00`);
-        newErrors.endTime = end <= start ? 'End Time must be after Start Time' : '';
+        const start = parseTimeToDate(value);
+        const end = parseTimeToDate(endTime);
+        newErrors.endTime = start && end && end <= start ? 'End Time must be after Start Time' : '';
       }
     } else if (name === 'endTime') {
+      const start = parseTimeToDate(startTime);
+      const end = parseTimeToDate(value);
       newErrors.endTime = !value
         ? 'End Time is required'
-        : startTime && new Date(`1970-01-01T${value}:00`) <= new Date(`1970-01-01T${startTime}:00`)
+        : start && end && end <= start
         ? 'End Time must be after Start Time'
         : '';
     } else if (name === 'about') {
@@ -180,9 +263,9 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
       newErrors.endTime = 'End Time is required';
       isValid = false;
     } else if (startTime && endTime) {
-      const start = new Date(`1970-01-01T${startTime}:00`);
-      const end = new Date(`1970-01-01T${endTime}:00`);
-      if (end <= start) {
+      const start = parseTimeToDate(startTime);
+      const end = parseTimeToDate(endTime);
+      if (start && end && end <= start) {
         newErrors.endTime = 'End Time must be after Start Time';
         isValid = false;
       }
@@ -207,6 +290,15 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
 //   });
 // }, []);
   const handleSave = async () => {
+    // Check if user is authenticated
+    if (!userId || userId === 'token' || userId === null || userId === undefined) {
+      CustomToaster.show('error', 'Authentication Error', {
+        duration: 3000,
+        text2: 'Please login to create listings.',
+      });
+      return;
+    }
+
     if (!validateForm()) {
       CustomToaster.show('error', 'Validation Error', {
         duration: 3000,
@@ -216,32 +308,92 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
     }
 
     setIsLoading(true);
+    // Format times for API
+    const formatTimeForAPI = (timeValue) => {
+      if (!timeValue) return '';
+      
+      // If it's a Date object, format it to HH:mm:ss
+      if (timeValue instanceof Date) {
+        const hours = timeValue.getHours().toString().padStart(2, '0');
+        const minutes = timeValue.getMinutes().toString().padStart(2, '0');
+        const seconds = timeValue.getSeconds().toString().padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
+      }
+      
+      // If it's already a time string, return as is
+      return timeValue.toString();
+    };
+
+    // Format dates for API
+    const formatDateForAPI = (dateValue) => {
+      if (!dateValue) return '';
+      
+      // If it's already a string, try to parse and format it
+      if (typeof dateValue === 'string') {
+        const date = new Date(dateValue);
+        if (!isNaN(date.getTime())) {
+          return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+        }
+        return dateValue;
+      }
+      
+      // If it's a Date object, format it to YYYY-MM-DD
+      if (dateValue instanceof Date) {
+        return dateValue.toISOString().split('T')[0];
+      }
+      
+      return dateValue.toString();
+    };
+
     const requestBody = {
       doctor_id: userId,
       listing_name: formData.listingName,
-      working_days_start: formData.startDate,
-      working_days_end: formData.endDate,
-      working_time_start: startTime,
-      working_time_end: endTime,
+      working_days_start: formatDateForAPI(formData.startDate),
+      working_days_end: formatDateForAPI(formData.endDate),
+      working_time_start: formatTimeForAPI(startTime),
+      working_time_end: formatTimeForAPI(endTime),
       about: formData.about,
       is_active: 0,
     };
 
     try {
-      const response = await axiosInstance.post('createUpdatedoctorlisting/listing', requestBody);
-      console.log('API response:', response?.data?.response?.docListingCreate?.doctor_list_id);
-      setListingIdState(response?.data?.response?.docListingCreate?.doctor_list_id);
-      setActiveTab('Add Plan');
-      onListingIdChange(response?.data?.response?.docListingCreate?.doctor_list_id);
-      CustomToaster.show('success', 'Success', {
-        duration: 3000,
-        text2: 'Listing saved successfully!',
-      });
+      let response;
+      if (editMode) {
+        // Update existing listing
+        const updateBody = {
+          ...requestBody,
+          doctor_list_id: existingListing.doctor_list_id,
+        };
+        console.log('📝 Updating listing with payload:', updateBody);
+        response = await axiosInstance.post('createUpdatedoctorlisting/listing', updateBody);
+        console.log('Update response:', response?.data);
+        
+        if (onListingUpdated) {
+          onListingUpdated();
+        }
+        
+        CustomToaster.show('success', 'Success', {
+          duration: 3000,
+          text2: 'Listing updated successfully!',
+        });
+      } else {
+        // Create new listing
+        response = await axiosInstance.post('createUpdatedoctorlisting/listing', requestBody);
+        console.log('API response:', response?.data?.response?.docListingCreate?.doctor_list_id);
+        setListingIdState(response?.data?.response?.docListingCreate?.doctor_list_id);
+        setActiveTab('Add Plan');
+        onListingIdChange(response?.data?.response?.docListingCreate?.doctor_list_id);
+        
+        CustomToaster.show('success', 'Success', {
+          duration: 3000,
+          text2: 'Listing saved successfully!',
+        });
+      }
     } catch (error) {
       console.error('Error saving listing:', error);
       CustomToaster.show('error', 'Error', {
         duration: 3000,
-        text2: 'Error saving listing!',
+        text2: error?.response?.data?.error || 'Error saving listing!',
       });
     } finally {
       setIsLoading(false);
@@ -297,8 +449,8 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
       {/* Time Range Picker */}
       <TimeRangePicker
         Type={'d'}
-        startTime={startTime}
-        endTime={endTime}
+        startTime={startTime ? formatTimeForDisplay(startTime) : null}
+        endTime={endTime ? formatTimeForDisplay(endTime) : null}
         onStartTimeChange={(time) => {
           setStartTime(time);
           validateField('startTime', time);
@@ -325,7 +477,7 @@ export default function ListingDetails({ setActiveTab, listingId, onListingIdCha
       {/* Submit Button */}
       <View style={styles.buttonsContainer}>
         <CustomButton
-          title={isLoading ? 'Saving...' : 'Next'}
+          title={isLoading ? (editMode ? 'Updating...' : 'Saving...') : (editMode ? 'Update' : 'Next')}
           bgColor={'#E72B4A'}
           fontfamily={'Poppins-SemiBold'}
           textColor={'white'}

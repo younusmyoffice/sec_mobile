@@ -113,7 +113,7 @@ const DialingCodeDropdown = ({
         selectedTextStyle={{
           fontSize: fontSize,
           fontFamily: fontFamily,
-          paddingHorizontal: 10,
+          paddingHorizontal: 8,
           color: disabled ? 'gray' : 'black',
         }}
         inputSearchStyle={styles.inputSearchStyle}
@@ -125,7 +125,7 @@ const DialingCodeDropdown = ({
         placeholder={placeholder}
         placeholderStyle={{
           fontSize: fontSize,
-          paddingHorizontal: 10,
+          paddingHorizontal: 8,
           color: '#AEAAAE',
         }}
         itemTextStyle={{

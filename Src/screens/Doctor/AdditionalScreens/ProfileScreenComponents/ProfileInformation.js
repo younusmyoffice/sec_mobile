@@ -20,6 +20,7 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
+import {getProfileImageSource, handleImageError, handleImageLoad} from '../../../../utils/imageUtils';
 export default function ProfileInformation({
   firstFive,
   rest,
@@ -32,6 +33,7 @@ export default function ProfileInformation({
   isDisabled,
   setIsDisabled,
   handleEnable,
+  submitForm,
 }) {
 
   const [markedDates, setMarkedDates] = useState({});
@@ -99,27 +101,6 @@ export default function ProfileInformation({
     }
     return marked;
   };
-  const handlePersonalUpdate = async () => {
-    try {
-      console.log("hello dosto chai peelo")
-      const response = await axiosInstance.post('updatePateintProfile', {
-        email: formData.email,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        middle_name: formData.middle_name,
-        added_by: formData.added_by,
-        gender: formData.gender,
-        DOB: formData.DOB,
-        // added profile picture
-        profile_picture: formData.profile_picture,
-        fileExtension: formData.fileExtension,
-      });
-      showdetails();
-      console.log('success', response.message);
-    } catch (e) {
-      console.log(e);
-    }
-  };
   console.log('first', formData);
   return (
     <SafeAreaView>
@@ -144,12 +125,11 @@ export default function ProfileInformation({
           </View>
           <View style={styles.container}>
             <Image
-              source={{
-                uri: local
-                  ? `content://media/picker_get_content/0/com.android.providers.media.photopicker/media/${formData?.profile_picture}` // Local path
-                  : `https://shareecare-profile.s3.amazonaws.com/${formData?.profile_picture}`, // Backend URL
-              }}
+              source={getProfileImageSource(formData?.profile_picture)}
+              onLoad={handleImageLoad}
+              onError={(error) => handleImageError(error)}
               style={styles.image}
+              defaultSource={require('../../../../assets/images/CardDoctor1.png')}
             />
             {/* <Image
               source={{uri: formData.profile_picture}}
@@ -195,7 +175,7 @@ export default function ProfileInformation({
             />
           ))}
           <View style={{marginVertical: 20,justifyContent:'flex-start',alignItems:'flex-start'}}><Text style={{color:'#331303',fontFamily:'Poppins-Medium',fontSize:hp(2)}}>Contact Details</Text></View>
-          {rest.map(item =>  (
+          {rest.map((item, index) =>  (
           <CustomInput
           ref={el => (inputRefs.current[index] = el)}
             key={item.id}
@@ -233,7 +213,7 @@ export default function ProfileInformation({
               borderColor="#E72B4A" // Darker green border
               borderWidth={1} // 2px border
               borderRadius={30}
-              onPress={handlePersonalUpdate}
+              onPress={submitForm}
             />
           </View>
         </View>

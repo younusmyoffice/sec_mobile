@@ -67,7 +67,7 @@ const SplashScreenWithAuth = () => {
         const userData = await AsyncStorage.getItem('role_id');
         const storedSuid = await AsyncStorage.getItem('suid');
 
-        console.log('suid for persistent login:', storedSuid);
+        // console.log('suid for persistent login:', storedSuid);
 
         // Normalize the role to match stack names
         const roleMap = {
@@ -81,11 +81,18 @@ const SplashScreenWithAuth = () => {
         // Delay navigation to show splash screen briefly
         setTimeout(() => {
           if (accessToken && userData) {
-            const normalizedRole = roleMap[Number(userData)] ; 
-            console.log('Navigating to:', normalizedRole); // Debug log
-            navigation.replace(normalizedRole);
+            const normalizedRole = roleMap[Number(userData)]; 
+            console.log('🔍 Session check - Role ID:', userData, 'Mapped to:', normalizedRole);
+            
+            if (normalizedRole) {
+              console.log('🚀 Navigating to:', normalizedRole);
+              navigation.replace(normalizedRole);
+            } else {
+              console.log('❌ Invalid role_id, navigating to Launchscreen');
+              navigation.replace('Launchscreen');
+            }
           } else {
-            console.log('No session, navigating to Authentication');
+            console.log('❌ No session found, navigating to Launchscreen');
             navigation.replace('Launchscreen');
           }
         }, 2000); // 2-second delay (adjust as needed)

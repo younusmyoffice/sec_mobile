@@ -16,6 +16,7 @@ import {useNavigation} from '@react-navigation/native';
 import {useCommon} from '../../../../../Store/CommonContext';
 import {validateField} from '../../../../../components/customInputs/FormValidation';
 import axios from 'axios';
+import {baseUrl} from '../../../../../utils/baseUrl';
 const ParentDoctorPackage = () => {
   const [activeTab, setactiveTab] = useState('Add Doctor');
   const [loading, setLoading] = useState(false);
@@ -24,16 +25,16 @@ const ParentDoctorPackage = () => {
   const [errors, setErrors] = useState({});
   const[isFieldValid,setIsFieldValid]=useState(false)
   const [doctorDetails, setDoctorDetails] = useState({
-    hcf_id: userId.toString(),
     email: '',
     mobile: '',
     role_id: '6',
     password: '',
     confirmpassword: '',
   });
-  console.log(doctorDetails);
-  // console.log('did', doctor_id);
-  console.log('load labr', load);
+  console.log('🔍 ParentDoctorPackage Debug:');
+  console.log('👤 User ID:', userId, 'Type:', typeof userId);
+  console.log('📋 Doctor Details:', doctorDetails);
+  console.log('🔄 Load state:', load);
   const addDoctorField = [
     {
       id: 1,
@@ -120,47 +121,84 @@ const ParentDoctorPackage = () => {
 
   const handleAddDoctorClinic = async () => {
     console.log("first Submitsaddsa",doctorDetails);
-    // if (!isFieldValid) return;
-    // if (isFieldValid || Object.keys(doctorDetails).length === 0) return;
+    
+    // Validate required fields
+    if (!doctorDetails.email || !doctorDetails.mobile || !doctorDetails.password || !doctorDetails.confirmpassword) {
+      Alert.alert('Missing Fields', 'Please fill in all required fields');
+      return;
+    }
+    
+    // Validate password match
+    if (doctorDetails.password !== doctorDetails.confirmpassword) {
+      Alert.alert('Password Mismatch', 'Password and confirm password do not match', [
+        {text: 'OK', onPress: () => console.log('Password mismatch')},
+      ]);
+      return;
+    }
+    
     try {
-      // setLoading(false)
-      // if (doctorDetails.password !== doctorDetails.confirmpassword) {
-      //   Alert.alert('Password Mismatch', 'password doesnt match', [
-      //     // {
-      //     //   text: 'Cancel',
-      //     //   onPress: () => console.log('Cancel Pressed'),
-      //     //   style: 'cancel',
-      //     // },
-      //     {text: 'OK', onPress: () => console.log('OK Pressed')},
-      //   ]);
-      // } else {
-        console.log('Adding wait.....');
-        const response = await axios.post(
-          `https://api.shareecare.com/sec/hcf/addDoctor`,
-          doctorDetails,
-        );
-        console.log(response.data);
-        // setLoading(true)
-
-        // const handleStaffVerify=()=>{
+      setLoading(true);
+      console.log('👨‍⚕️ Adding doctor with data:', doctorDetails);
+      
+      const response = await axiosInstance.post(
+        `hcf/addDoctor`,
+        doctorDetails,
+      );
+      
+      console.log('✅ Doctor creation response:', response.data);
+      
+      // Check if doctor was created successfully
+      if (response.data?.error === 'EMAIL_NOT_VERIFIED') {
+        console.log('📧 Doctor created, email verification required');
+        
+        // Navigate to OTP verification
         navigation.navigate('verify-doctorotp', {
           data: doctorDetails,
           routePath: 'doctor-package',
         });
+        
+        // Clear form after successful submission
         setDoctorDetails({
-          confirmpassword: '',
           email: '',
           mobile: '',
+          role_id: '6',
           password: '',
+          confirmpassword: '',
         });
-        // }
-      // }
+        
+      } else if (response.data?.response?.doctor_id) {
+        console.log('✅ Doctor created successfully with ID:', response.data.response.doctor_id);
+        
+        // Navigate directly to package creation if no verification needed
+        navigation.navigate('doctor-package');
+        
+      } else {
+        console.log('⚠️ Unexpected response:', response.data);
+        Alert.alert('Success', 'Doctor created successfully');
+      }
+      
     } catch (error) {
-      console.log(error);
+      console.error('❌ Error adding doctor:', error);
+      
+      let errorMessage = 'Failed to add doctor. Please try again.';
+      
+      if (error.response?.data?.error) {
+        if (error.response.data.error === 'MOBILE_EXISTS_FOR_PATIENT_DIAGNOSTIC_ADMIN') {
+          errorMessage = 'Mobile number already exists. Please use a different mobile number.';
+        } else if (error.response.data.error === 'EMAIL_EXISTS') {
+          errorMessage = 'Email already exists. Please use a different email address.';
+        } else {
+          errorMessage = error.response.data.error;
+        }
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {}, [userId]);
+  // Note: hcf_id is automatically set by the backend from the authenticated user's suid
 
   const renderComponent = () => {
     switch (activeTab) {

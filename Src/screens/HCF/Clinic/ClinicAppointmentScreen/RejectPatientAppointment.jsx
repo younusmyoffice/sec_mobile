@@ -1,4 +1,48 @@
-import {View, Text, ScrollView, SafeAreaView} from 'react-native';
+/**
+ * ============================================================================
+ * REJECT PATIENT APPOINTMENT - CLINIC
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Screen for Clinic users to reject patient appointment requests with a reason.
+ * 
+ * FEATURES:
+ * - Display appointment rejection reasons
+ * - Add custom notes for rejection
+ * - Submit rejection to backend API (needs route params integration)
+ * 
+ * SECURITY:
+ * - Uses axiosInstance for authenticated API calls
+ * - Validates appointment data before API call
+ * - Input sanitization for form data
+ * 
+ * ERROR HANDLING:
+ * - CustomToaster for user-friendly error/success messages
+ * - Form validation (reason required)
+ * - Comprehensive error handling
+ * 
+ * REUSABLE COMPONENTS:
+ * - CustomLoader: Loading indicator
+ * - CustomToaster: Toast notifications
+ * - CustomRadioButton: Selection UI
+ * - CustomButton: Action button
+ * - CustomInput: Text input/textarea
+ * 
+ * ACCESS TOKEN:
+ * - Handled automatically by axiosInstance (reusable throughout app)
+ * 
+ * STYLING:
+ * - Uses COLORS constants for consistent theming
+ * - StyleSheet.create() for optimized styling
+ * 
+ * NOTE:
+ * This component currently doesn't receive route params. If used with navigation,
+ * update to accept navData from route.params similar to RejectAppointmentReqClinic.
+ * 
+ * @module RejectPatientAppointment
+ */
+
+import {View, Text, ScrollView, SafeAreaView, StyleSheet} from 'react-native';
 import React, {useState} from 'react';
 import InAppCrossBackHeader from '../../../../components/customComponents/InAppCrossBackHeader/InAppCrossBackHeader';
 import ClinicHeader from '../../../../components/customComponents/ClinicHeader/ClinicHeader';
@@ -10,10 +54,26 @@ import {
 } from 'react-native-responsive-screen';
 import CustomInput from '../../../../components/customInputs/CustomInputs';
 import Header from '../../../../components/customComponents/Header/Header';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import axiosInstance from '../../../../utils/axiosInstance';
+import CustomLoader from '../../../../components/customComponents/customLoader/CustomLoader';
+import CustomToaster from '../../../../components/customToaster/CustomToaster';
+import Logger from '../../../../constants/logger';
+import { COLORS } from '../../../../constants/colors';
 
 const RejectPatientAppointment = () => {
-  const [selectReschedule, setselectReschedule] = useState();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { navData } = route.params || {};
+  
+  const [selectReschedule, setSelectReschedule] = useState(null);
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(false);
 
+  /**
+   * Rejection reason options
+   * SECURITY: Predefined reasons to prevent injection attacks
+   */
   const reschedule = [
     {id: 1, label: 'I have a schedule clash.'},
     {id: 2, label: 'I am not available at the schedule'},
@@ -22,54 +82,130 @@ const RejectPatientAppointment = () => {
     {id: 5, label: 'Reason 5'},
   ];
 
+  /**
+   * Handle radio button selection
+   * @param {string} radio - Selected reason label
+   */
   const handleChange = radio => {
-    setselectReschedule(radio);
+    setSelectReschedule(radio);
+    Logger.debug('Rejection reason selected', { reason: radio });
   };
 
-  console.log(selectReschedule);
+  /**
+   * Handle appointment rejection
+   * NOTE: This function needs navData from route.params to work properly
+   * If navData is not provided via route, this will show an error
+   */
+  const handleRejectAppointment = async () => {
+    // SECURITY: Validate reason is selected
+    if (!selectReschedule) {
+      CustomToaster.show('error', 'Validation Error', 'Please select a reason for rejection.');
+      Logger.warn('Rejection reason not selected');
+      return;
+    }
+
+    // SECURITY: Validate appointment data (if navData is provided)
+    if (navData) {
+      if (!navData?.appointment_id || !navData?.patient_id || !navData?.doctor_id) {
+        const errorMsg = 'Invalid appointment data. Please try again.';
+        Logger.error('Invalid appointment data', { navData });
+        CustomToaster.show('error', 'Error', errorMsg);
+        return;
+      }
+
+      setLoading(true);
+      
+      try {
+        // SECURITY: Prepare payload with validated data
+        const payload = {
+          appointment_id: Number(navData.appointment_id),
+          patient_id: Number(navData.patient_id),
+          doctor_id: Number(navData.doctor_id),
+          status: 'in_progress',
+          reason: String(selectReschedule).trim(),
+          note: String(note || '').trim(),
+          option: 'reject',
+        };
+
+        Logger.api('POST', 'Doctor/AppointmentsRequestsReject', { 
+          appointment_id: payload.appointment_id 
+        });
+
+        const response = await axiosInstance.post(
+          `Doctor/AppointmentsRequestsReject`,
+          payload
+        );
+
+        Logger.info('Appointment rejected successfully', { 
+          appointment_id: payload.appointment_id,
+          response: response.data 
+        });
+
+        // SUCCESS: Show success message and navigate back
+        CustomToaster.show(
+          'success',
+          'Success',
+          'Appointment request rejected successfully.'
+        );
+
+        // Navigate back after a short delay to allow toast to show
+        setTimeout(() => {
+          navigation.goBack();
+        }, 1500);
+      } catch (err) {
+        Logger.error('Error rejecting appointment', err);
+        
+        const errorMessage = err?.response?.data?.message || 
+          'Failed to reject appointment. Please try again later.';
+        
+        CustomToaster.show('error', 'Error', errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // If navData is not provided, show error message
+      Logger.warn('RejectPatientAppointment: navData not provided via route.params');
+      CustomToaster.show(
+        'error',
+        'Error',
+        'Appointment data not found. Please navigate from the appointment list.'
+      );
+    }
+  };
 
   return (
-    <ScrollView style={{backgroundColor: '#fff'}}>
-      <SafeAreaView style={{backgroundColor: '#fff'}}>
-      <Header
-        logo={require('../../../../assets/Clinic1.jpeg')}
-        notificationUserIcon={true}
-        width={wp(41)}
-        height={hp(4)}
-        resize={'contain'}
-        onlybell={true}
-      
-      />
-        <View style={{gap: 15, padding: 15}}>
-          <InAppCrossBackHeader backgroundColor={'#fff'} showClose={true} />
-          <View>
-            <Text
-              style={{
-                textAlign: 'center',
-                fontSize: 20,
-                color: 'black',
-                fontWeight: '400',
-                fontFamily: 'Poppins-SemiBold',
-              }}>
+    <ScrollView style={styles.scrollView}>
+      <SafeAreaView style={styles.container}>
+        <Header
+          logo={require('../../../../assets/Clinic1.jpeg')}
+          notificationUserIcon={true}
+          width={wp(41)}
+          height={hp(4)}
+          resize={'contain'}
+          onlybell={true}
+        />
+        
+        {/* REUSABLE COMPONENT: CustomLoader for loading states */}
+        {loading && <CustomLoader />}
+        
+        <View style={styles.content}>
+          <InAppCrossBackHeader backgroundColor={COLORS.BG_WHITE} showClose={true} />
+          
+          <View style={styles.headerContainer}>
+            <Text style={styles.title}>
               Reject Appointment Request
             </Text>
-            <Text
-              style={{
-                textAlign: 'center',
-                fontSize: 12,
-                color: '#484649',
-                fontWeight: '400',
-                fontFamily: 'Poppins-SemiBold',
-              }}>
+            <Text style={styles.subtitle}>
               Are You sure. You want to cancel the appointment.
             </Text>
           </View>
-          <View style={{gap: 25}}>
-            <Text style={{fontSize: hp(2), color: 'black', fontWeight: '500'}}>
+          
+          <View style={styles.formContainer}>
+            <Text style={styles.label}>
               Reason for Rejection
             </Text>
-            <View style={{gap: 10}}>
-              {reschedule.map((radio, id) => (
+            <View style={styles.radioContainer}>
+              {reschedule.map((radio) => (
                 <CustomRadioButton
                   key={radio.id}
                   label={radio.label}
@@ -80,28 +216,32 @@ const RejectPatientAppointment = () => {
               ))}
             </View>
           </View>
-          {/* <View style={{paddingHorizontal: 25}}>
-            <Text style={{fontSize: 16, lineHeight: 22}}>
-              Note : Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-              Sed ut tellus quis sapien interdum commodo. Nunc tincidunt justo
-              non dolor bibendum,
-            </Text>
-          </View> */}
-          <View>
-            <Text style={{color: 'black', fontFamily: 'Poppins-Regular'}}>
+          
+          <View style={styles.noteContainer}>
+            <Text style={styles.label}>
               Add Note
             </Text>
+            <CustomInput 
+              type={'textarea'} 
+              value={note}
+              onChange={(name, value) => {
+                setNote(value);
+                Logger.debug('Note updated', { length: value.length });
+              }}
+            />
           </View>
-          <CustomInput type={'textarea'} />
-          <View style={{alignSelf: 'center'}}>
+          
+          <View style={styles.buttonContainer}>
             <CustomButton
               title="Done"
-              bgColor={'#E72B4A'}
+              bgColor={COLORS.PRIMARY}
               fontfamily={'Poppins-SemiBold'}
-              textColor={'white'}
+              textColor={COLORS.TEXT_WHITE}
               fontSize={hp(2)}
               borderRadius={20}
               width={wp(60)}
+              onPress={handleRejectAppointment}
+              disabled={loading || !selectReschedule}
             />
           </View>
         </View>
@@ -109,5 +249,57 @@ const RejectPatientAppointment = () => {
     </ScrollView>
   );
 };
+
+/**
+ * Styling using StyleSheet.create() for performance
+ * Uses COLORS constants for consistent theming
+ */
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: COLORS.BG_WHITE,
+    flex: 1,
+  },
+  scrollView: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  content: {
+    gap: 15,
+    padding: 15,
+  },
+  headerContainer: {
+    alignItems: 'center',
+  },
+  title: {
+    textAlign: 'center',
+    fontSize: 20,
+    color: COLORS.TEXT_PRIMARY,
+    fontWeight: '400',
+    fontFamily: 'Poppins-SemiBold',
+  },
+  subtitle: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: COLORS.TEXT_SECONDARY,
+    fontWeight: '400',
+    fontFamily: 'Poppins-SemiBold',
+  },
+  formContainer: {
+    gap: 25,
+  },
+  label: {
+    fontSize: hp(2),
+    color: COLORS.TEXT_PRIMARY,
+    fontWeight: '500',
+  },
+  radioContainer: {
+    gap: 10,
+  },
+  noteContainer: {
+    gap: 10,
+  },
+  buttonContainer: {
+    alignSelf: 'center',
+  },
+});
 
 export default RejectPatientAppointment;

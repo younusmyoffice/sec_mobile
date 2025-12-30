@@ -1,14 +1,28 @@
+/**
+ * ============================================================================
+ * DIAGNOSTIC PROFILE SCREEN
+ * ============================================================================
+ *
+ * PURPOSE:
+ * View and edit diagnostic staff profile details.
+ *
+ * SECURITY:
+ * - Uses axiosInstance for authenticated API calls.
+ * - Validates userId before API calls and form submission.
+ *
+ * ERROR HANDLING:
+ * - User feedback via CustomToaster; no alerts.
+ * - Graceful loading/empty handling with CustomLoader and defaults.
+ */
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  ActivityIndicator,
   TouchableWithoutFeedback,
 } from 'react-native';
 import React, {useState, useEffect, useRef} from 'react';
-import axios from 'axios';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -20,13 +34,17 @@ import Header from '../../../../components/customComponents/Header/Header';
 import {baseUrl} from '../../../../utils/baseUrl';
 import {useCommon} from '../../../../Store/CommonContext';
 import axiosInstance from '../../../../utils/axiosInstance';
+import CustomLoader from '../../../../components/customComponents/customLoader/CustomLoader';
+import CustomToaster from '../../../../components/customToaster/CustomToaster';
+import Logger from '../../../../constants/logger';
+import { COLORS } from '../../../../constants/colors';
 
 export default function DiagnosticProfileScreen() {
-  const [profile, setProfile] = useState({});
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [name, setName] = useState('');
   const [formData, setFormData] = useState({
-    suid: 8,
+    suid: '',
     first_name: '',
     email: '',
     mobile: '',
@@ -51,25 +69,44 @@ export default function DiagnosticProfileScreen() {
 
   useEffect(() => {
     const fetchProfile = async () => {
+      // SECURITY: Validate userId before API call
+      if (!userId || userId === 'null' || userId === 'undefined') {
+        Logger.error('Invalid userId for diagnostic profile', { userId });
+        CustomToaster.show('error', 'Error', 'Invalid user session. Please login again.');
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
-        const response = await axiosInstance.get(
-          `${baseUrl}hcf/getDiagnosticStaffProfile/${userId}`,
-        );
-        console.log('dsafdsafdsafds', response.data.response);
-        // if (response.data.response.length > 0) {
-        //   const userData = response.data.response[0];
-        //   console.log('diag form', userData);
-        setFormData(response.data.response[0]);
-        setName(response.data.response[0].first_name);
-        // }
+        Logger.api('GET', `hcf/getDiagnosticStaffProfile/${userId}`);
+        const response = await axiosInstance.get(`${baseUrl}hcf/getDiagnosticStaffProfile/${userId}`);
+        const body = response?.data?.response;
+        if (Array.isArray(body) && body[0]) {
+          const userData = body[0];
+          setFormData({
+            suid: userData.suid || userId,
+            first_name: userData.first_name || '',
+            email: userData.email || '',
+            mobile: userData.mobile || '',
+            role_id: userData.role_id || 4,
+          });
+          setName(userData.first_name || '');
+          Logger.info('Diagnostic profile fetched');
+        } else {
+          Logger.warn('Diagnostic profile empty');
+          CustomToaster.show('error', 'Error', 'Profile data not found.');
+        }
       } catch (error) {
-        console.error('Error fetching profile:', error);
+        Logger.error('Diagnostic profile fetch failed', error);
+        const errorMessage = error?.response?.data?.message || 'Failed to fetch profile.';
+        CustomToaster.show('error', 'Error', errorMessage);
       } finally {
         setLoading(false);
       }
     };
     fetchProfile();
-  }, []);
+  }, [userId]);
   const handleChange = (name, value) => {
     setFormData(prev => ({
       ...prev,
@@ -78,29 +115,53 @@ export default function DiagnosticProfileScreen() {
   };
 
   const handleUpdate = async () => {
-    console.log(formData);
+    // BASIC VALIDATION
+    if (!formData.first_name || !formData.email || !formData.mobile) {
+      CustomToaster.show('error', 'Validation Error', 'Please fill First Name, Email and Mobile');
+      return;
+    }
+    if (!userId || userId === 'null' || userId === 'undefined') {
+      CustomToaster.show('error', 'Error', 'Invalid user session. Please login again.');
+      return;
+    }
+
+    setUpdating(true);
     try {
-      const response = await axios.post(`${baseUrl}hcf/updateStaff`, formData);
-      if (response.data.response?.statusCode === 200) {
-        alert('Profile updated successfully');
+      const payload = {
+        suid: formData.suid || userId,
+        first_name: String(formData.first_name || '').trim(),
+        email: String(formData.email || '').trim(),
+        mobile: String(formData.mobile || '').trim(),
+        role_id: formData.role_id || 4,
+      };
+      Logger.api('POST', 'hcf/updateStaff', { email: payload.email });
+      const response = await axiosInstance.post(`${baseUrl}hcf/updateStaff`, payload);
+      if (response?.data?.response?.statusCode === 200) {
+        CustomToaster.show('success', 'Success', 'Profile updated successfully');
+        setIsDisabled(true);
       } else {
-        alert('Failed to update profile');
+        const errorMessage = response?.data?.response?.message || 'Failed to update profile.';
+        CustomToaster.show('error', 'Error', errorMessage);
       }
     } catch (error) {
-      console.error('Error updating profile:', error);
+      Logger.error('Diagnostic profile update failed', error);
+      const errorMessage = error?.response?.data?.message || 'Failed to update profile.';
+      CustomToaster.show('error', 'Error', errorMessage);
+    } finally {
+      setUpdating(false);
     }
   };
 
   if (loading) {
     return (
-      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-        <ActivityIndicator size="large" color="#E72B4A" />
-      </View>
+      <SafeAreaView style={styles.loaderContainer}>
+        <CustomLoader />
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={{backgroundColor: '#fff'}}>
+    <ScrollView style={styles.scrollView}>
       <Header
         logo={require('../../../../assets/headerDiagonsis.jpeg')}
         onlybell={true}
@@ -108,63 +169,36 @@ export default function DiagnosticProfileScreen() {
         height={hp(4)}
         resize={'contain'}
       />
-      <SafeAreaView style={{backgroundColor: '#fff'}}>
-        <View style={{padding: 15, gap: 10}}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
           <View
-            style={{
-              backgroundColor: '#E72B4A',
-              paddingVertical: 10,
-              paddingHorizontal: 20,
-              borderRadius: 10,
-              width: wp(41),
-            }}>
-            <Text style={{color: 'white'}}>Profile Information</Text>
+            style={styles.sectionHeaderBox}>
+            <Text style={styles.sectionHeaderText}>Profile Information</Text>
           </View>
           <TouchableWithoutFeedback onPress={handleEnable}>
           <View
-            style={{
-              flexDirection: 'row',
-              alignSelf: 'flex-end',
-              alignItems: 'center',
-              gap: 5,
-            }}>
+            style={styles.editRow}>
             <MaterialCommunityIcons
               name="pencil"
-              color={'#E72B4A'}
+              color={COLORS.PRIMARY}
               size={hp(2)}
             />
             <Text
-              style={{
-                color: '#E72B4A',
-                fontFamily: 'Poppins-Medium',
-                fontSize: hp(2),
-              }}>
+              style={styles.editText}>
               Edit Profile
             </Text>
           </View>
 
           </TouchableWithoutFeedback>
           <View
-            style={{
-              marginTop: '5%',
-              alignSelf: 'center',
-              flexDirection: 'row',
-            }}>
+            style={styles.profileIdRow}>
             <Text
-              style={{
-                color: '#AEAAAE',
-                fontFamily: 'Poppins-Medium',
-                fontSize: hp(2),
-              }}>
+              style={styles.profileIdLabel}>
               Profile ID:
             </Text>
             <Text
-              style={{
-                color: '#E72B4A',
-                fontFamily: 'Poppins-Medium',
-                fontSize: hp(2),
-              }}>
-              3456467DFG
+              style={styles.profileIdValue}>
+              {formData.suid || userId || 'N/A'}
             </Text>
           </View>
           <View>
@@ -218,13 +252,14 @@ export default function DiagnosticProfileScreen() {
           <View style={{alignSelf: 'center'}}>
             <CustomButton
               title="Submit"
-              bgColor={'#E72B4A'}
+              bgColor={COLORS.PRIMARY}
               fontfamily={'Poppins-SemiBold'}
-              textColor={'white'}
+              textColor={COLORS.TEXT_WHITE}
               fontSize={hp(2)}
               borderRadius={20}
               width={wp(60)}
               onPress={handleUpdate}
+              disabled={isDisabled || updating}
             />
           </View>
         </View>
@@ -233,4 +268,58 @@ export default function DiagnosticProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  scrollView: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  container: {
+    backgroundColor: COLORS.BG_WHITE,
+  },
+  content: {
+    padding: 15,
+    gap: 10,
+  },
+  sectionHeaderBox: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    width: wp(41),
+  },
+  sectionHeaderText: {
+    color: COLORS.TEXT_WHITE,
+    fontFamily: 'Poppins-Medium',
+  },
+  editRow: {
+    flexDirection: 'row',
+    alignSelf: 'flex-end',
+    alignItems: 'center',
+    gap: 5,
+  },
+  editText: {
+    color: COLORS.PRIMARY,
+    fontFamily: 'Poppins-Medium',
+    fontSize: hp(2),
+  },
+  profileIdRow: {
+    marginTop: '5%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+  },
+  profileIdLabel: {
+    color: COLORS.TEXT_GRAY,
+    fontFamily: 'Poppins-Medium',
+    fontSize: hp(2),
+  },
+  profileIdValue: {
+    color: COLORS.PRIMARY,
+    fontFamily: 'Poppins-Medium',
+    fontSize: hp(2),
+  },
+});
